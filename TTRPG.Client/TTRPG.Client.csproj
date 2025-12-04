@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Compile Remove="Program.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TTRPG.Shared\TTRPG.Shared.csproj" />
   </ItemGroup>
 
