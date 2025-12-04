@@ -57,7 +57,7 @@ public class ServerNetworkService : INetEventListener
     public void OnConnectionRequest(ConnectionRequest request)
     {
         // For Phase 1, we accept everyone. Later, we can check passwords/versions.
-        request.AcceptIfKey("CartridgeCore_Key");
+        request.AcceptIfKey("TTRPG_KEY");
     }
 
     // Unused for Handshake, but required by interface

@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Compile Remove="Services\ClientNetworkService.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TTRPG.Server.Abstractions\TTRPG.Server.Abstractions.csproj" />
     <ProjectReference Include="..\TTRPG.Shared\TTRPG.Shared.csproj" />
   </ItemGroup>
