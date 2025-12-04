@@ -1,0 +1,32 @@
+- id: "goblin_grunt"
+  name: "Goblin Grunt"
+  components:
+    Position: 
+      x: 0
+      y: 0
+    Health: 
+      current: 30
+      max: 30
+    Stats:
+      strength: 8
+      agility: 12
+
+- id: "orc_warrior"
+  name: "Orc Warrior"
+  components:
+    Position: 
+      x: 5
+      y: 5
+    Health: 
+      current: 80
+      max: 80
+
+- id: "template_elite"
+  name: "Elite Modifier"
+  components:
+    Stats:
+      strength: 18
+      agility: 15
+    Health:
+      current: 50
+      max: 50
