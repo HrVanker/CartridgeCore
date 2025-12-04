@@ -11,7 +11,7 @@ public class ServerNetworkService : INetEventListener
     public int ConnectedPeersCount => _netManager.ConnectedPeersCount;
     public bool IsRunning => _netManager.IsRunning;
 
-    public event Action<NetPeer>? OnPlayerConnected;
+    public Action<LiteNetLib.NetPeer>? OnPlayerConnected;
     public event Action<NetPeer>? OnPlayerDisconnected;
 
     public ServerNetworkService()
@@ -38,9 +38,13 @@ public class ServerNetworkService : INetEventListener
     }
 
     // --- LiteNetLib Interface Implementations ---
-    public void OnPeerConnected(NetPeer peer)
+    public void OnPeerConnected(LiteNetLib.NetPeer peer)
     {
-        Console.WriteLine($"[Network] Player connected: {peer.EndPoint}");
+        // EndPoint returns a System.Net.IPEndPoint. 
+        // If System.Net is missing, this property often appears "missing" to the compiler.
+        Console.WriteLine($"[Network] Player connected: {peer}");
+
+        // Invoke the event
         OnPlayerConnected?.Invoke(peer);
     }
 
