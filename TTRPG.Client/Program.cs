@@ -8,6 +8,8 @@ namespace TTRPG.Client
     {
         static void Main()
         {
+            using (var game = new Game1())
+                game.Run();
             Console.WriteLine("=== CLIENT STARTED (HEADLESS MODE) ===");
 
             // 1. Initialize the Network Service

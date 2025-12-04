@@ -1,0 +1,146 @@
+﻿using System;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
+using TTRPG.Client.Services;
+using System.IO;
+
+namespace TTRPG.Client
+{
+    public class Game1 : Game
+    {
+        private GraphicsDeviceManager _graphics;
+
+        // NULLABLE FIX: We add '?' because these are created in Initialize(), not the Constructor.
+        private SpriteBatch? _spriteBatch;
+        private RenderTarget2D? _renderTarget;
+        private ClientNetworkService? _networkService;
+
+        // Resolution Settings
+        private const int VIRTUAL_WIDTH = 640;
+        private const int VIRTUAL_HEIGHT = 360;
+        private Rectangle _destinationRectangle;
+        private Texture2D? _goblinTexture;
+        private Vector2 _goblinPosition = new Vector2(100, 100);
+
+        public Game1()
+        {
+            _graphics = new GraphicsDeviceManager(this);
+            Content.RootDirectory = "Content";
+            IsMouseVisible = true;
+
+            Window.AllowUserResizing = true;
+
+            // FIX: Match strict signature (object? sender)
+            Window.ClientSizeChanged += OnResize;
+
+            // FIX: Hook the Exit event here instead of overriding the protected method
+            Exiting += OnGameExiting;
+        }
+
+        protected override void Initialize()
+        {
+            _graphics.PreferredBackBufferWidth = 1280;
+            _graphics.PreferredBackBufferHeight = 720;
+            _graphics.ApplyChanges();
+
+            _renderTarget = new RenderTarget2D(GraphicsDevice, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+            UpdateDestinationRectangle();
+
+            _networkService = new ClientNetworkService();
+            _networkService.Connect("localhost", 9050);
+
+            base.Initialize();
+        }
+
+        protected override void LoadContent()
+        {
+            _spriteBatch = new SpriteBatch(GraphicsDevice);
+
+            // WORLD CARTRIDGE LOADER (Simulated)
+            // We look for the raw file in the bin output folder
+            string texturePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "goblin.png");
+
+            if (File.Exists(texturePath))
+            {
+                using (var fileStream = new FileStream(texturePath, FileMode.Open))
+                {
+                    _goblinTexture = Texture2D.FromStream(GraphicsDevice, fileStream);
+                }
+                System.Console.WriteLine("[Client] Loaded goblin.png successfully.");
+            }
+            else
+            {
+                System.Console.WriteLine($"[Client] Error: Could not find {texturePath}");
+            }
+        }
+
+        protected override void Update(GameTime gameTime)
+        {
+            if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
+                Exit();
+
+            // Null check required now
+            _networkService?.Poll();
+
+            base.Update(gameTime);
+        }
+
+        protected override void Draw(GameTime gameTime)
+        {
+            // Safety checks
+            if (_renderTarget == null || _spriteBatch == null) return;
+
+            // --- PASS 1: Low Res World ---
+            GraphicsDevice.SetRenderTarget(_renderTarget);
+            GraphicsDevice.Clear(Color.CornflowerBlue);
+
+            _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            if (_goblinTexture != null)
+            {
+                _spriteBatch.Draw(_goblinTexture, _goblinPosition, Color.White);
+            }
+
+            _spriteBatch.End();
+
+            // --- PASS 2: Upscale to Monitor ---
+            GraphicsDevice.SetRenderTarget(null);
+            GraphicsDevice.Clear(Color.Black);
+
+            _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            _spriteBatch.Draw(_renderTarget, _destinationRectangle, Color.White);
+            _spriteBatch.End();
+
+            base.Draw(gameTime);
+        }
+
+        private void UpdateDestinationRectangle()
+        {
+            var screenSize = GraphicsDevice.PresentationParameters.Bounds;
+
+            float scaleX = (float)screenSize.Width / VIRTUAL_WIDTH;
+            float scaleY = (float)screenSize.Height / VIRTUAL_HEIGHT;
+            float finalScale = System.Math.Min(scaleX, scaleY);
+
+            int newWidth = (int)(VIRTUAL_WIDTH * finalScale);
+            int newHeight = (int)(VIRTUAL_HEIGHT * finalScale);
+
+            int posX = (screenSize.Width - newWidth) / 2;
+            int posY = (screenSize.Height - newHeight) / 2;
+
+            _destinationRectangle = new Rectangle(posX, posY, newWidth, newHeight);
+        }
+
+        // FIX: Strict Nullability Signature
+        private void OnResize(object? sender, EventArgs e)
+        {
+            UpdateDestinationRectangle();
+        }
+
+        // FIX: Event Handler instead of Override
+        private void OnGameExiting(object? sender, EventArgs e)
+        {
+            _networkService?.Stop();
+        }
+    }
+}

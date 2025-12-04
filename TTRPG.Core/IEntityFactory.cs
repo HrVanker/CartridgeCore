@@ -9,6 +9,6 @@ namespace TTRPG.Core
         /// </summary>
         Entity Create(string blueprintId, World world);
 
-        void ApplyTemplate(Entity entity, string templateId);
+        void ApplyTemplate(Entity entity, string templateId, World world);
     }
 }

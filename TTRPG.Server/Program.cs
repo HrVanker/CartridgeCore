@@ -16,11 +16,28 @@ namespace TTRPG.Server
             // 1. Initialize the ECS World (The "Game State")
             // This holds all entities (players, monsters, items).
             var world = World.Create();
+            var loader = new BlueprintLoader();
+            string manifestPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "manifest.yaml");
+            var manifest = loader.LoadManifest(manifestPath);
+
+            Console.WriteLine($"[Cartridge] Loading '{manifest.Name}' (v{manifest.Version}) by {manifest.Author}");
 
             // 2. Load Blueprints (The "Campaign Cartridge")
-            var loader = new BlueprintLoader();
             string dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "monsters.yaml");
             var blueprints = loader.LoadBlueprints(dataPath);
+            foreach (var dep in manifest.Dependencies)
+            {
+                Console.WriteLine($"  - Requires: {dep.Key} (v{dep.Value}+)");
+                // Simulation: We assume "Core_Rules" is always present.
+                if (dep.Key == "Core_Rules")
+                {
+                    Console.WriteLine("    [OK] Dependency Satisfied.");
+                }
+                else
+                {
+                    Console.WriteLine("    [WARNING] Missing Dependency!");
+                }
+            }
 
             // 3. Initialize the Factory (The "Builder")
             // We pass the blueprints so the factory knows how to build a "goblin_grunt"
@@ -35,7 +52,7 @@ namespace TTRPG.Server
                 var goblin = factory.Create("goblin_grunt", world);
 
                 // Apply the "Elite" Template (Decorator Pattern)
-                factory.ApplyTemplate(goblin, "template_elite");
+                factory.ApplyTemplate(goblin, "template_elite", world);
                 
                 // --- VERIFICATION START ---
                 // We ask the World: "Give me the Stats and Health for this specific goblin entity"

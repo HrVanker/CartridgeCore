@@ -44,5 +44,25 @@ namespace TTRPG.Server.Services
                 return new List<EntityBlueprint>();
             }
         }
+
+        public CampaignManifest LoadManifest(string filePath)
+        {
+            if (!File.Exists(filePath))
+            {
+                Console.WriteLine($"[Loader] Warning: Manifest not found at {filePath}");
+                return new CampaignManifest { Name = "Unknown Campaign" };
+            }
+
+            try
+            {
+                var yamlText = File.ReadAllText(filePath);
+                return _deserializer.Deserialize<CampaignManifest>(yamlText);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Loader] Error parsing manifest: {ex.Message}");
+                return new CampaignManifest();
+            }
+        }
     }
 }

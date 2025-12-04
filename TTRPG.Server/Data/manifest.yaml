@@ -1,0 +1,5 @@
+name: "The Goblin Caves"
+version: "0.5.0"
+author: "DM_Steve"
+dependencies:
+  Core_Rules: "1.0.0"
