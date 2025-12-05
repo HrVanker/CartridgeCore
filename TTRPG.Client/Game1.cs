@@ -22,7 +22,7 @@ namespace TTRPG.Client
         private const int VIRTUAL_HEIGHT = 360;
         private Rectangle _destinationRectangle;
         private TextureManager? _textureManager;
-        private Vector2 _goblinPosition = new Vector2(100, 100);
+        private Dictionary<int, Vector2> _entityPositions = new Dictionary<int, Vector2>();
         private Color _goblinColor = Color.Red;
 
         private Color _backgroundColor = Color.CornflowerBlue; // Default Explore
@@ -77,12 +77,9 @@ namespace TTRPG.Client
             };
             EventBus.OnEntityMoved += (id, pos) =>
             {
-                // For now, we assume ALL movement is "The Goblin"
-                // Later, we will check "id" to move specific monsters.
-
-                // Convert Grid Coordinate (0,0) to Pixel Coordinate (0,0)
-                // Let's assume 1 Grid Unit = 16 Pixels
-                _goblinPosition = new Vector2(pos.X * 16, pos.Y * 16);
+                // Update or Add the entity position
+                // Convert Grid (16px) to Screen
+                _entityPositions[id] = new Vector2(pos.X * 16, pos.Y * 16);
             };
 
             _networkService = new ClientNetworkService();
@@ -152,11 +149,17 @@ namespace TTRPG.Client
             GraphicsDevice.Clear(_backgroundColor);
 
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            var texture = _textureManager?.GetTexture("goblin");
 
+            var texture = _textureManager?.GetTexture("goblin");
             if (texture != null)
             {
-                _spriteBatch.Draw(texture, _goblinPosition, _goblinColor);
+                // Draw EVERY entity we know about
+                foreach (var kvp in _entityPositions)
+                {
+                    // kvp.Value is the Position
+                    // Optional: We could tint them based on ID (kvp.Key) to tell them apart
+                    _spriteBatch.Draw(texture, kvp.Value, Color.White);
+                }
             }
 
             _spriteBatch.End();

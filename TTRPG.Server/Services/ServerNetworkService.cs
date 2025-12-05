@@ -5,6 +5,7 @@ using LiteNetLib;
 using LiteNetLib.Utils;
 using TTRPG.Shared; // Required for JoinRequestPacket
 using TTRPG.Shared.Enums;
+using TTRPG.Shared.Components;
 
 namespace TTRPG.Server.Services
 {
@@ -146,6 +147,39 @@ namespace TTRPG.Server.Services
             {
                 // 2. Forward to Game Logic
                 OnPlayerInput?.Invoke(entity, packet.Direction);
+            }
+        }
+        private Arch.Core.World _world;
+
+        // Add Method to inject it (Call this from Program.cs)
+        public void SetWorld(Arch.Core.World world)
+        {
+            _world = world;
+        }
+        public void BroadcastToZone<T>(string targetZoneId, T packet, DeliveryMethod method = DeliveryMethod.ReliableOrdered) where T : class, new()
+        {
+            if (_world == null) return;
+
+            NetDataWriter writer = new NetDataWriter();
+            _packetProcessor.Write(writer, packet);
+
+            // Iterate over all connected players
+            foreach (var session in _playerSessions)
+            {
+                NetPeer peer = session.Key;
+                Arch.Core.Entity entity = session.Value;
+
+                // CHECK: Does this player have a Zone component?
+                if (_world.Has<Zone>(entity))
+                {
+                    var playerZone = _world.Get<Zone>(entity);
+
+                    // FILTER: Only send if they are in the target zone
+                    if (playerZone.Id == targetZoneId)
+                    {
+                        peer.Send(writer, method);
+                    }
+                }
             }
         }
 

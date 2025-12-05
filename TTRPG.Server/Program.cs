@@ -78,6 +78,7 @@ namespace TTRPG.Server
 
             // 6. Start Networking
             var serverService = new ServerNetworkService();
+            serverService.SetWorld(world); // <--- VITAL NEW LINE
             serverService.Start(9050);
 
             Console.WriteLine("Press ESC to stop...");
@@ -92,10 +93,11 @@ namespace TTRPG.Server
             {
                 Console.WriteLine($"[Server] Spawning Player for Peer {peer.Id}...");
 
-                // Use Factory to create the entity
                 var playerEntity = factory.Create("goblin_grunt", world);
 
-                // IMPORTANT: Register the session mapping
+                // ADD ZONE COMPONENT
+                world.Add(playerEntity, new Zone { Id = "Zone_A" }); // Start in Zone A
+
                 serverService.RegisterPlayerEntity(peer, playerEntity);
             };
 
