@@ -34,7 +34,7 @@ namespace TTRPG.Client
                 Thread.Sleep(15);
 
                 // Check for exit
-                if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape)
+                    if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape)
                 {
                     isRunning = false;
                 }

@@ -20,7 +20,7 @@ namespace TTRPG.Client
         private const int VIRTUAL_WIDTH = 640;
         private const int VIRTUAL_HEIGHT = 360;
         private Rectangle _destinationRectangle;
-        private Texture2D? _goblinTexture;
+        private TextureManager? _textureManager;
         private Vector2 _goblinPosition = new Vector2(100, 100);
 
         public Game1()
@@ -57,22 +57,11 @@ namespace TTRPG.Client
         {
             _spriteBatch = new SpriteBatch(GraphicsDevice);
 
-            // WORLD CARTRIDGE LOADER (Simulated)
-            // We look for the raw file in the bin output folder
-            string texturePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "goblin.png");
+            // 1. Initialize Manager
+            _textureManager = new TextureManager(GraphicsDevice);
 
-            if (File.Exists(texturePath))
-            {
-                using (var fileStream = new FileStream(texturePath, FileMode.Open))
-                {
-                    _goblinTexture = Texture2D.FromStream(GraphicsDevice, fileStream);
-                }
-                System.Console.WriteLine("[Client] Loaded goblin.png successfully.");
-            }
-            else
-            {
-                System.Console.WriteLine($"[Client] Error: Could not find {texturePath}");
-            }
+            // 2. Load ALL assets found in the folder
+            _textureManager.LoadContent();
         }
 
         protected override void Update(GameTime gameTime)
@@ -96,9 +85,11 @@ namespace TTRPG.Client
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            if (_goblinTexture != null)
+            var texture = _textureManager?.GetTexture("goblin");
+
+            if (texture != null)
             {
-                _spriteBatch.Draw(_goblinTexture, _goblinPosition, Color.White);
+                _spriteBatch.Draw(texture, _goblinPosition, Color.White);
             }
 
             _spriteBatch.End();
