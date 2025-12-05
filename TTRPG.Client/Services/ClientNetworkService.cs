@@ -41,6 +41,7 @@ namespace TTRPG.Client.Services
             _packetProcessor.SubscribeReusable<GameStatePacket>(OnGameStateReceived);
             _packetProcessor.SubscribeReusable<EntityPositionPacket>(OnPositionReceived);
             _packetProcessor.SubscribeReusable<ChatMessagePacket>(OnChatReceived);
+            _packetProcessor.SubscribeReusable<EntityDetailsPacket>(OnDetailsReceived);
 
             // 2. HANDLE CONNECTION SUCCESS
             _listener.PeerConnectedEvent += peer =>
@@ -137,6 +138,18 @@ namespace TTRPG.Client.Services
             NetDataWriter writer = new NetDataWriter();
             _packetProcessor.Write(writer, packet);
             _client.FirstPeer?.Send(writer, DeliveryMethod.ReliableOrdered);
+        }
+        public void InspectEntity(int entityId)
+        {
+            var packet = new InspectEntityPacket { EntityId = entityId };
+            NetDataWriter writer = new NetDataWriter();
+            _packetProcessor.Write(writer, packet);
+            _client.FirstPeer?.Send(writer, DeliveryMethod.ReliableOrdered);
+        }
+        private void OnDetailsReceived(EntityDetailsPacket packet)
+        {
+            // Route to EventBus so the UI can draw it
+            TTRPG.Client.Systems.EventBus.PublishEntityInspected(packet.EntityId, packet.Details);
         }
     }
 }

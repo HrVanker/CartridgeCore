@@ -6,6 +6,7 @@ using LiteNetLib.Utils;
 using TTRPG.Shared; // Required for JoinRequestPacket
 using TTRPG.Shared.Enums;
 using TTRPG.Shared.Components;
+using Arch.Core.Extensions;
 
 namespace TTRPG.Server.Services
 {
@@ -23,9 +24,10 @@ namespace TTRPG.Server.Services
         public Action<NetPeer, DisconnectInfo>? OnPlayerDisconnected;
         public Action<Entity, MoveDirection>? OnPlayerInput;
 
+        public Action<NetPeer, ChatMessagePacket>? OnChatMessage;
+
         public ServerNetworkService()
         {
-            // 1. Initialize the Packet Processor
             _packetProcessor = new NetPacketProcessor();
 
             _packetProcessor.RegisterNestedType<TTRPG.Shared.Components.Position>(
@@ -42,13 +44,19 @@ namespace TTRPG.Server.Services
                         Y = reader.GetInt()
                     };
                 }
+
         );
 
             // 2. Subscribe to the JoinRequestPacket
             // When this packet arrives, run the 'OnJoinReceived' method
             _packetProcessor.SubscribeReusable<JoinRequestPacket, NetPeer>(OnJoinReceived);
-
+            _packetProcessor.SubscribeReusable<InspectEntityPacket, NetPeer>(OnInspectReceived);
             _packetProcessor.SubscribeReusable<PlayerMovePacket, NetPeer>(OnMoveReceived);
+
+            _packetProcessor.SubscribeReusable<ChatMessagePacket, NetPeer>((packet, peer) =>
+            {
+                OnChatMessage?.Invoke(peer, packet);
+            });
 
             // 3. Initialize Manager listening to 'this' class
             _netManager = new NetManager(this);
@@ -187,5 +195,56 @@ namespace TTRPG.Server.Services
         public void OnNetworkError(IPEndPoint endPoint, System.Net.Sockets.SocketError socketError) { }
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType) { }
         public void OnNetworkLatencyUpdate(NetPeer peer, int latency) { }
+
+        private void OnInspectReceived(InspectEntityPacket packet, NetPeer peer)
+        {
+            if (_world == null) return;
+
+            // Arch Entity IDs are just integers, but usually need a "Generation" for safety.
+            // For this phase, we assume the ID provided is valid and alive.
+            // We construct a "Unsafe" entity reference using just the ID.
+            // In a full production Arch app, we'd track Generation too.
+            var targetEntity = _world.Reference(packet.EntityId);
+
+            if (targetEntity.IsAlive())
+            {
+                var entity = targetEntity.Entity;
+                string info = $"ID: {entity.Id}";
+
+                // 1. Get Health
+                if (_world.Has<TTRPG.Shared.Components.Health>(entity))
+                {
+                    var hp = _world.Get<TTRPG.Shared.Components.Health>(entity);
+                    info += $"\nHP: {hp.Current}/{hp.Max}";
+                }
+
+                // 2. Get Stats
+                if (_world.Has<TTRPG.Shared.Components.Stats>(entity))
+                {
+                    var stats = _world.Get<TTRPG.Shared.Components.Stats>(entity);
+                    info += $"\nSTR: {stats.Strength} AGI: {stats.Agility}";
+                }
+
+                // 3. Get Zone
+                if (_world.Has<TTRPG.Shared.Components.Zone>(entity))
+                {
+                    var zone = _world.Get<TTRPG.Shared.Components.Zone>(entity);
+                    info += $"\nZone: {zone.Id}";
+                }
+
+                // 4. Send Reply (Private message to the requester)
+                var response = new EntityDetailsPacket
+                {
+                    EntityId = packet.EntityId,
+                    Details = info
+                };
+
+                NetDataWriter writer = new NetDataWriter();
+                _packetProcessor.Write(writer, response);
+                peer.Send(writer, DeliveryMethod.ReliableOrdered);
+
+                Console.WriteLine($"[Inspector] Sent details for Entity {entity.Id} to Peer {peer.Id}");
+            }
+        }
     }
 }

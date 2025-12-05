@@ -34,6 +34,12 @@ namespace TTRPG.Client
         private double _lastMoveTime;
         private const double MOVE_DELAY = 0.15; // 200ms between steps
 
+        //UI Elements
+        private MouseState _lastMouseState;
+        private string _currentTooltip = string.Empty;
+        private Vector2 _tooltipPosition;
+        private double _tooltipTimer; // Hide after 3 seconds
+
         public Game1()
         {
             _graphics = new GraphicsDeviceManager(this);
@@ -87,6 +93,11 @@ namespace TTRPG.Client
                     LastUpdate = _currentGameTime // We need to capture GameTime, see below
                 };
             };
+            EventBus.OnEntityInspected += (id, details) =>
+            {
+                _currentTooltip = details;
+                _tooltipTimer = 3.0; // Show for 3 seconds
+            };
 
             _networkService = new ClientNetworkService();
             _networkService.Connect("localhost", 9050);
@@ -112,16 +123,77 @@ namespace TTRPG.Client
                 Exit();
 
             // 2. Capture Time & Input
-            double currentTime = gameTime.TotalGameTime.TotalSeconds;
+            _currentGameTime = gameTime.TotalGameTime.TotalSeconds; // Update for TTL logic
             var kState = Keyboard.GetState();
 
             if (_networkService != null)
             {
-                // --- MOVEMENT LOGIC (Existing) ---
-                // (Only run if we passed the movement delay)
-                // ... [Your existing movement code here] ...
+                // --- MOVEMENT LOGIC (Restored) ---
+                if (_currentGameTime - _lastMoveTime > 0.15) // 150ms delay
+                {
+                    if (kState.IsKeyDown(Keys.Up))
+                    {
+                        _networkService.SendMove(Shared.Enums.MoveDirection.Up);
+                        _lastMoveTime = _currentGameTime;
+                    }
+                    else if (kState.IsKeyDown(Keys.Down))
+                    {
+                        _networkService.SendMove(Shared.Enums.MoveDirection.Down);
+                        _lastMoveTime = _currentGameTime;
+                    }
+                    else if (kState.IsKeyDown(Keys.Left))
+                    {
+                        _networkService.SendMove(Shared.Enums.MoveDirection.Left);
+                        _lastMoveTime = _currentGameTime;
+                    }
+                    else if (kState.IsKeyDown(Keys.Right))
+                    {
+                        _networkService.SendMove(Shared.Enums.MoveDirection.Right);
+                        _lastMoveTime = _currentGameTime;
+                    }
+                }
+                //Entity Inspection Logic
+                var mState = Mouse.GetState();
 
-                // --- NEW: CHAT & DM TOOLS ---
+                // DETECT RIGHT CLICK
+                if (mState.RightButton == ButtonState.Pressed && _lastMouseState.RightButton == ButtonState.Released)
+                {
+                    // 1. Screen -> World Coordinates
+                    // We rendered to a DestinationRectangle, so first remove that offset
+                    float scaleX = (float)VIRTUAL_WIDTH / _destinationRectangle.Width;
+                    float scaleY = (float)VIRTUAL_HEIGHT / _destinationRectangle.Height;
+
+                    // Mouse relative to the Game Window (0,0 is top left of window)
+                    float relativeX = (mState.X - _destinationRectangle.X) * scaleX;
+                    float relativeY = (mState.Y - _destinationRectangle.Y) * scaleY;
+
+                    // Apply Camera Offset (We shifted (0,0) to center of screen)
+                    // Camera Center is (VIRTUAL_WIDTH/2, VIRTUAL_HEIGHT/2)
+                    float worldX = relativeX - (VIRTUAL_WIDTH / 2f);
+                    float worldY = relativeY - (VIRTUAL_HEIGHT / 2f);
+
+                    // 2. Hit Test
+                    // Find closest entity within 20 pixels
+                    foreach (var kvp in _entities)
+                    {
+                        var entPos = kvp.Value.Position; // This is already in "World Screen Pixels" (x*16)
+
+                        if (Vector2.Distance(new Vector2(worldX, worldY), entPos) < 20)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[UI] Inspecting Entity {kvp.Key}...");
+                            _networkService.InspectEntity(kvp.Key);
+                            _tooltipPosition = new Vector2(relativeX, relativeY); // Draw tooltip where we clicked
+                            break;
+                        }
+                    }
+                }
+                _lastMouseState = mState;
+
+                // Timer Logic
+                if (_tooltipTimer > 0) _tooltipTimer -= gameTime.ElapsedGameTime.TotalSeconds;
+                else _currentTooltip = string.Empty;
+
+                // --- CHAT & DM TOOLS LOGIC ---
                 // Press 'T' to talk
                 if (kState.IsKeyDown(Keys.T) && _lastKeyState.IsKeyUp(Keys.T))
                 {
@@ -139,14 +211,24 @@ namespace TTRPG.Client
                 {
                     _networkService.SendChat("/tp Zone_B");
                 }
-                // -----------------------------
             }
 
-            // 3. Update State for next frame
-            // This is crucial! It records what keys were down this frame
+            // 3. GHOST CLEANUP LOGIC (TTL)
+            var toRemove = new System.Collections.Generic.List<int>();
+            foreach (var kvp in _entities)
+            {
+                if (_currentGameTime - kvp.Value.LastUpdate > 1.0)
+                    toRemove.Add(kvp.Key);
+            }
+            foreach (var id in toRemove)
+            {
+                _entities.Remove(id);
+            }
+
+            // 4. Update State for next frame
             _lastKeyState = kState;
 
-            // 4. Poll Network
+            // 5. Poll Network
             _networkService?.Poll();
 
             base.Update(gameTime);
@@ -210,7 +292,23 @@ namespace TTRPG.Client
             }
 
             _spriteBatch.End();
+            // DRAW TOOLTIP
+            if (!string.IsNullOrEmpty(_currentTooltip))
+            {
+                // Draw a simple black box background
+                // Ideally measure string size, but we'll use a fixed box for the test
+                _spriteBatch.Draw(_whitePixel, new Rectangle((int)_tooltipPosition.X, (int)_tooltipPosition.Y, 120, 60), Color.Black * 0.8f);
 
+                // Draw Text
+                // Since we don't have a SpriteFont loaded, we must use a debug method OR load a font.
+                // CRITICAL: MonoGame crashes if you DrawString without a Font.
+                // FOR THIS TEST: We will print to Debug Console unless you have a SpriteFont.
+                // Assuming NO FONT: We draw colored squares to represent data or just use the Console.
+
+                // ... Wait, do we have a font? No. 
+                // Let's use the Console Output for the text, and a Yellow Box on screen to confirm visual hit.
+                _spriteBatch.Draw(_whitePixel, new Rectangle((int)_tooltipPosition.X, (int)_tooltipPosition.Y, 10, 10), Color.Yellow);
+            }
             // --- PASS 2: Upscale to Monitor ---
             GraphicsDevice.SetRenderTarget(null);
             GraphicsDevice.Clear(Color.Black);

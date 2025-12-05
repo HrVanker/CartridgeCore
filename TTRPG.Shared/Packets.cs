@@ -39,4 +39,16 @@ namespace TTRPG.Shared
         public string Sender { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
     }
+    // Client -> Server: "What is this thing?"
+    public class InspectEntityPacket
+    {
+        public int EntityId { get; set; }
+    }
+
+    // Server -> Client: "Here are the stats."
+    public class EntityDetailsPacket
+    {
+        public int EntityId { get; set; }
+        public string Details { get; set; } = string.Empty; // e.g., "Goblin\nHP: 30/30"
+    }
 }

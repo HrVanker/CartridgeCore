@@ -28,5 +28,10 @@ namespace TTRPG.Client.Systems
         {
             OnEntityMoved?.Invoke(entityId, pos);
         }
+        public static event Action<int, string>? OnEntityInspected;
+        public static void PublishEntityInspected(int id, string details)
+        {
+            OnEntityInspected?.Invoke(id, details);
+        }
     }
 }

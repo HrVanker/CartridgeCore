@@ -20,6 +20,11 @@ namespace TTRPG.Server.Services
             // Phase 5 (Launcher) would load this from a file.
             _config = new ServerConfig { IsCasualMode = true };
 
+            _network.OnChatMessage += (peer, packet) =>
+            {
+                // Pass the peer and the text string to your existing logic
+                SendChatMessage(peer, packet.Message);
+            };
         }
 
         public void ToggleMode()
