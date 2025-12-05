@@ -14,17 +14,26 @@ namespace TTRPG.Server.Services
         private readonly ServerNetworkService _network;
         private World _world;
         private Random _random = new Random();
+        private readonly NotificationService _notifications;
+
+        // NEW: Timer for Heartbeat
+        private float _heartbeatTimer = 0f;
+        private const float HEARTBEAT_RATE = 0.5f; // Send updates every 500ms
+
+        // NEW: Arch Query to find everyone
+        private Arch.Core.QueryDescription _entitiesQuery = new Arch.Core.QueryDescription().WithAll<Position, Zone>();
 
         // 1. STATE PER ZONE: We track the status of each room independently
         private Dictionary<string, GameState> _zoneStates = new Dictionary<string, GameState>();
         private Dictionary<string, int> _zoneSteps = new Dictionary<string, int>();
         private Dictionary<string, int> _zoneThresholds = new Dictionary<string, int>();
 
-        public GameLoopService(ServerNetworkService network, World world)
+        public GameLoopService(ServerNetworkService network, World world, NotificationService notifications)
         {
             _network = network;
             _world = world;
             _network.OnPlayerInput += HandlePlayerMove;
+            _notifications = notifications;
         }
 
         // Helper to safely get state (Default to Exploration)
@@ -33,7 +42,26 @@ namespace TTRPG.Server.Services
             return _zoneStates.ContainsKey(zoneId) ? _zoneStates[zoneId] : GameState.Exploration;
         }
 
-        public void Update(float deltaTime) { /* No global timer needed */ }
+        public void Update(float deltaTime)
+        {
+            // 1. Run Heartbeat Logic
+            _heartbeatTimer += deltaTime;
+            if (_heartbeatTimer >= HEARTBEAT_RATE)
+            {
+                _heartbeatTimer = 0f;
+                SendHeartbeat();
+            }
+        }
+        private void SendHeartbeat()
+        {
+            // Iterate over ALL entities with Position + Zone
+            _world.Query(in _entitiesQuery, (Entity entity, ref Position pos, ref Zone zone) =>
+            {
+                // Re-broadcast their location to their specific zone
+                // This keeps the Client's "TTL" timer fresh so they don't disappear.
+                BroadcastPositionToZone(entity.Id, pos, zone.Id);
+            });
+        }
 
         private void HandlePlayerMove(Entity entity, MoveDirection direction)
         {
@@ -108,6 +136,8 @@ namespace TTRPG.Server.Services
             _zoneStates[zoneId] = GameState.Combat;
             BroadcastStateToZone(zoneId); // Only turns RED for people in this room!
 
+            _notifications.BroadcastZoneEvent(zoneId, "ENCOUNTER STARTED!");
+
             // End combat after 5 seconds
             System.Threading.Tasks.Task.Delay(5000).ContinueWith(_ => EndCombat(zoneId));
         }
@@ -120,6 +150,7 @@ namespace TTRPG.Server.Services
 
             Console.WriteLine($"[{zoneId}] Combat Ended.");
             BroadcastStateToZone(zoneId);
+            _notifications.BroadcastZoneEvent(zoneId, "Combat Ended.");
         }
 
         private void BroadcastStateToZone(string zoneId)

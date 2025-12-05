@@ -40,6 +40,7 @@ namespace TTRPG.Client.Services
             _packetProcessor.SubscribeReusable<JoinResponsePacket>(OnJoinResponse);
             _packetProcessor.SubscribeReusable<GameStatePacket>(OnGameStateReceived);
             _packetProcessor.SubscribeReusable<EntityPositionPacket>(OnPositionReceived);
+            _packetProcessor.SubscribeReusable<ChatMessagePacket>(OnChatReceived);
 
             // 2. HANDLE CONNECTION SUCCESS
             _listener.PeerConnectedEvent += peer =>
@@ -121,6 +122,14 @@ namespace TTRPG.Client.Services
         private void OnPositionReceived(EntityPositionPacket packet)
         {
             EventBus.PublishEntityMoved(packet.EntityId, packet.Position);
+        }
+        private void OnChatReceived(ChatMessagePacket packet)
+        {
+            // For now, just print to the Debug Output (Output Window in VS)
+            System.Diagnostics.Debug.WriteLine($"[CHAT] {packet.Sender}: {packet.Message}");
+
+            // Optional: Route to EventBus if you want to display it on screen later
+            // EventBus.PublishChatMessage(packet.Sender, packet.Message);
         }
     }
 }

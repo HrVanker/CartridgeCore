@@ -34,4 +34,9 @@ namespace TTRPG.Shared
         public int EntityId { get; set; } // Arch Entity ID
         public Position Position { get; set; }
     }
+    public class ChatMessagePacket
+    {
+        public string Sender { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+    }
 }

@@ -78,17 +78,18 @@ namespace TTRPG.Server
 
             // 6. Start Networking
             var serverService = new ServerNetworkService();
-            serverService.SetWorld(world); // <--- VITAL NEW LINE
+            serverService.SetWorld(world);
             serverService.Start(9050);
 
             Console.WriteLine("Press ESC to stop...");
 
             // 7. Main Loop
-            var gameLoop = new GameLoopService(serverService, world);
             var stopwatch = Stopwatch.StartNew();
+            var notificationService = new NotificationService(serverService, world);
 
             // 8. HOOK UP SPAWNING LOGIC
             // When a peer connects, create a Goblin for them!
+            var gameLoop = new GameLoopService(serverService, world, notificationService);
             serverService.OnPlayerConnected += (peer) =>
             {
                 Console.WriteLine($"[Server] Spawning Player for Peer {peer.Id}...");
@@ -104,21 +105,30 @@ namespace TTRPG.Server
             bool isRunning = true;
             while (isRunning)
             {
-                // Network Tick
-                serverService.Poll();
-                // Calculate Delta Time (Seconds since last frame)
+                // Calculate Delta Time
                 float deltaTime = (float)stopwatch.Elapsed.TotalSeconds;
                 stopwatch.Restart();
 
+                serverService.Poll();
                 gameLoop.Update(deltaTime);
-
-                // (Future: World.Update() would go here for game logic)
 
                 Thread.Sleep(15);
 
-                if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape)
+                // FIX: READ KEY ONCE
+                if (Console.KeyAvailable)
                 {
-                    isRunning = false;
+                    // Consumes the key from the buffer immediately
+                    var key = Console.ReadKey(true).Key;
+
+                    if (key == ConsoleKey.Escape)
+                    {
+                        isRunning = false;
+                    }
+                    else if (key == ConsoleKey.C)
+                    {
+                        // Now 'C' will actually trigger!
+                        notificationService.ToggleMode();
+                    }
                 }
             }
 
