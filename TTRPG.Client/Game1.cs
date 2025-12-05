@@ -22,8 +22,9 @@ namespace TTRPG.Client
         private const int VIRTUAL_HEIGHT = 360;
         private Rectangle _destinationRectangle;
         private TextureManager? _textureManager;
-        private Dictionary<int, Vector2> _entityPositions = new Dictionary<int, Vector2>();
+        private Dictionary<int, EntityRenderData> _entities = new Dictionary<int, EntityRenderData>();
         private Color _goblinColor = Color.Red;
+        private double _currentGameTime;
 
         private Color _backgroundColor = Color.CornflowerBlue; // Default Explore
         private Texture2D? _whitePixel;
@@ -78,9 +79,12 @@ namespace TTRPG.Client
             };
             EventBus.OnEntityMoved += (id, pos) =>
             {
-                // Update or Add the entity position
-                // Convert Grid (16px) to Screen
-                _entityPositions[id] = new Vector2(pos.X * 16, pos.Y * 16);
+                var screenPos = new Vector2(pos.X * 16, pos.Y * 16);
+                _entities[id] = new EntityRenderData
+                {
+                    Position = screenPos,
+                    LastUpdate = _currentGameTime // We need to capture GameTime, see below
+                };
             };
 
             _networkService = new ClientNetworkService();
@@ -102,6 +106,8 @@ namespace TTRPG.Client
 
         protected override void Update(GameTime gameTime)
         {
+            _currentGameTime = gameTime.TotalGameTime.TotalSeconds;
+
             if (_networkService != null)
             {
                 double currentTime = gameTime.TotalGameTime.TotalSeconds;
@@ -136,6 +142,24 @@ namespace TTRPG.Client
 
             // Null check required now
             _networkService?.Poll();
+
+            // CLEANUP GHOSTS
+            // Create a list of IDs to remove
+            var toRemove = new System.Collections.Generic.List<int>();
+
+            foreach (var kvp in _entities)
+            {
+                // If we haven't heard from this entity in 1.0 seconds, cull it.
+                if (_currentGameTime - kvp.Value.LastUpdate > 1.0)
+                {
+                    toRemove.Add(kvp.Key);
+                }
+            }
+
+            foreach (var id in toRemove)
+            {
+                _entities.Remove(id);
+            }
 
             base.Update(gameTime);
         }
@@ -190,11 +214,10 @@ namespace TTRPG.Client
             var goblinTex = _textureManager?.GetTexture("goblin");
             if (goblinTex != null)
             {
-                foreach (var kvp in _entityPositions)
+                foreach (var kvp in _entities)
                 {
-                    // Draw sprite at calculated position
-                    // Since we applied the Matrix, these coordinates are now relative to the center!
-                    _spriteBatch.Draw(goblinTex, kvp.Value, Color.White);
+                    // kvp.Value is now the struct, so access .Position
+                    _spriteBatch.Draw(goblinTex, kvp.Value.Position, Color.White);
                 }
             }
 
@@ -238,6 +261,11 @@ namespace TTRPG.Client
         private void OnGameExiting(object? sender, EventArgs e)
         {
             _networkService?.Stop();
+        }
+        private struct EntityRenderData
+        {
+            public Vector2 Position;
+            public double LastUpdate;
         }
     }
 }
