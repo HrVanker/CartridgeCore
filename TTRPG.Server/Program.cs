@@ -4,6 +4,7 @@ using System.Threading;
 using Arch.Core; // <--- The ECS Core
 using TTRPG.Server.Services;
 using TTRPG.Shared.Components;
+using System.Diagnostics; // Required for Stopwatch
 
 namespace TTRPG.Server
 {
@@ -82,11 +83,32 @@ namespace TTRPG.Server
             Console.WriteLine("Press ESC to stop...");
 
             // 7. Main Loop
+            var gameLoop = new GameLoopService(serverService, world);
+            var stopwatch = Stopwatch.StartNew();
+
+            // 8. HOOK UP SPAWNING LOGIC
+            // When a peer connects, create a Goblin for them!
+            serverService.OnPlayerConnected += (peer) =>
+            {
+                Console.WriteLine($"[Server] Spawning Player for Peer {peer.Id}...");
+
+                // Use Factory to create the entity
+                var playerEntity = factory.Create("goblin_grunt", world);
+
+                // IMPORTANT: Register the session mapping
+                serverService.RegisterPlayerEntity(peer, playerEntity);
+            };
+
             bool isRunning = true;
             while (isRunning)
             {
                 // Network Tick
                 serverService.Poll();
+                // Calculate Delta Time (Seconds since last frame)
+                float deltaTime = (float)stopwatch.Elapsed.TotalSeconds;
+                stopwatch.Restart();
+
+                gameLoop.Update(deltaTime);
 
                 // (Future: World.Update() would go here for game logic)
 

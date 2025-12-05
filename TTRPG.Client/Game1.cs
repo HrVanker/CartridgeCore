@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using TTRPG.Client.Services;
 using System.IO;
+using TTRPG.Client.Systems;
 
 namespace TTRPG.Client
 {
@@ -22,6 +23,13 @@ namespace TTRPG.Client
         private Rectangle _destinationRectangle;
         private TextureManager? _textureManager;
         private Vector2 _goblinPosition = new Vector2(100, 100);
+        private Color _goblinColor = Color.Red;
+
+        private Color _backgroundColor = Color.CornflowerBlue; // Default Explore
+
+        //Movement
+        private double _lastMoveTime;
+        private const double MOVE_DELAY = 0.15; // 200ms between steps
 
         public Game1()
         {
@@ -47,6 +55,27 @@ namespace TTRPG.Client
             _renderTarget = new RenderTarget2D(GraphicsDevice, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
             UpdateDestinationRectangle();
 
+            EventBus.OnServerJoined += (message) =>
+            {
+                // Update the "UI" (Visuals)
+                _goblinColor = Color.Green; // Turn Green on success
+                System.Diagnostics.Debug.WriteLine($"[UI] Connection confirmed: {message}");
+            };
+
+            EventBus.OnGameStateChanged += (newState) =>
+            {
+                if (newState == Shared.Enums.GameState.Combat)
+                {
+                    _backgroundColor = Color.DarkRed; // DANGER!
+                    System.Diagnostics.Debug.WriteLine("[UI] Entering Combat Mode");
+                }
+                else
+                {
+                    _backgroundColor = Color.CornflowerBlue; // Safe
+                    System.Diagnostics.Debug.WriteLine("[UI] Entering Exploration Mode");
+                }
+            };
+
             _networkService = new ClientNetworkService();
             _networkService.Connect("localhost", 9050);
 
@@ -66,6 +95,35 @@ namespace TTRPG.Client
 
         protected override void Update(GameTime gameTime)
         {
+            if (_networkService != null)
+            {
+                double currentTime = gameTime.TotalGameTime.TotalSeconds;
+                if (currentTime - _lastMoveTime > MOVE_DELAY)
+                {
+                    var kState = Keyboard.GetState();
+
+                    if (kState.IsKeyDown(Keys.Up))
+                    {
+                        _networkService.SendMove(Shared.Enums.MoveDirection.Up);
+                        _lastMoveTime = currentTime;
+                    }
+                    else if (kState.IsKeyDown(Keys.Down))
+                    {
+                        _networkService.SendMove(Shared.Enums.MoveDirection.Down);
+                        _lastMoveTime = currentTime;
+                    }
+                    else if (kState.IsKeyDown(Keys.Left))
+                    {
+                        _networkService.SendMove(Shared.Enums.MoveDirection.Left);
+                        _lastMoveTime = currentTime;
+                    }
+                    else if (kState.IsKeyDown(Keys.Right))
+                    {
+                        _networkService.SendMove(Shared.Enums.MoveDirection.Right);
+                        _lastMoveTime = currentTime;
+                    }
+                }
+            }
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
 
@@ -82,14 +140,14 @@ namespace TTRPG.Client
 
             // --- PASS 1: Low Res World ---
             GraphicsDevice.SetRenderTarget(_renderTarget);
-            GraphicsDevice.Clear(Color.CornflowerBlue);
+            GraphicsDevice.Clear(_backgroundColor);
 
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
             var texture = _textureManager?.GetTexture("goblin");
 
             if (texture != null)
             {
-                _spriteBatch.Draw(texture, _goblinPosition, Color.White);
+                _spriteBatch.Draw(texture, _goblinPosition, _goblinColor);
             }
 
             _spriteBatch.End();

@@ -1,7 +1,9 @@
 ﻿using System;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using TTRPG.Client.Systems;
 using TTRPG.Shared;
+using TTRPG.Shared.Enums;
 
 namespace TTRPG.Client.Services
 {
@@ -16,6 +18,7 @@ namespace TTRPG.Client.Services
             _listener = new EventBasedNetListener();
             _client = new NetManager(_listener);
             _packetProcessor = new NetPacketProcessor();
+            _packetProcessor.SubscribeReusable<GameStatePacket>(OnGameStateReceived);
 
             // 1. REGISTER RESPONSE HANDLER
             // When the Server replies, this method runs
@@ -78,12 +81,25 @@ namespace TTRPG.Client.Services
         {
             if (packet.Success)
             {
-                Console.WriteLine($"[Client] Server Accepted Us: {packet.Message}");
+                EventBus.PublishServerJoined(packet.Message);
             }
             else
             {
-                Console.WriteLine($"[Client] Server Rejected Us: {packet.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Client] Rejected: {packet.Message}");
             }
+        }
+        private void OnGameStateReceived(GameStatePacket packet)
+        {
+            EventBus.PublishStateChanged(packet.NewState);
+        }
+        public void SendMove(TTRPG.Shared.Enums.MoveDirection direction)
+        {
+            var packet = new PlayerMovePacket { Direction = direction };
+            NetDataWriter writer = new NetDataWriter();
+            _packetProcessor.Write(writer, packet);
+
+            // Send ReliableOrdered to ensure moves don't get skipped/out of order
+            _client.FirstPeer?.Send(writer, DeliveryMethod.ReliableOrdered);
         }
     }
 }

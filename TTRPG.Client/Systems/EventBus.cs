@@ -1,0 +1,25 @@
+﻿using System;
+using TTRPG.Shared.Enums;
+
+namespace TTRPG.Client.Systems
+{
+    public static class EventBus
+    {
+        // Event: Fired when the Client successfully joins the server
+        // Payload: The welcome message from the server
+        public static event Action<string>? OnServerJoined;
+
+        // Method to safely invoke the event
+        public static void PublishServerJoined(string message)
+        {
+            OnServerJoined?.Invoke(message);
+        }
+
+        public static event Action<GameState>? OnGameStateChanged;
+
+        public static void PublishStateChanged(GameState newState)
+        {
+            OnGameStateChanged?.Invoke(newState);
+        }
+    }
+}

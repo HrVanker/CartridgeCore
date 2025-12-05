@@ -1,14 +1,17 @@
 ﻿using System;
+using System.Net;
+using Arch.Core;
 using LiteNetLib;
 using LiteNetLib.Utils;
-using System.Net;
 using TTRPG.Shared; // Required for JoinRequestPacket
+using TTRPG.Shared.Enums;
 
 namespace TTRPG.Server.Services
 {
     // We keep INetEventListener because that is what you successfully implemented
     public class ServerNetworkService : INetEventListener
     {
+        private readonly Dictionary<NetPeer, Entity> _playerSessions = new Dictionary<NetPeer, Entity>();
         private readonly NetManager _netManager;
         private readonly NetPacketProcessor _packetProcessor; // <--- NEW: Handles data logic
 
@@ -16,7 +19,8 @@ namespace TTRPG.Server.Services
         public bool IsRunning => _netManager.IsRunning;
 
         public Action<NetPeer>? OnPlayerConnected;
-        public event Action<NetPeer>? OnPlayerDisconnected;
+        public Action<NetPeer, DisconnectInfo>? OnPlayerDisconnected;
+        public Action<Entity, MoveDirection>? OnPlayerInput;
 
         public ServerNetworkService()
         {
@@ -26,6 +30,8 @@ namespace TTRPG.Server.Services
             // 2. Subscribe to the JoinRequestPacket
             // When this packet arrives, run the 'OnJoinReceived' method
             _packetProcessor.SubscribeReusable<JoinRequestPacket, NetPeer>(OnJoinReceived);
+
+            _packetProcessor.SubscribeReusable<PlayerMovePacket, NetPeer>(OnMoveReceived);
 
             // 3. Initialize Manager listening to 'this' class
             _netManager = new NetManager(this);
@@ -81,7 +87,12 @@ namespace TTRPG.Server.Services
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
             Console.WriteLine($"[Network] Player disconnected: {disconnectInfo.Reason}");
-            OnPlayerDisconnected?.Invoke(peer);
+            // Cleanup Session
+            if (_playerSessions.ContainsKey(peer))
+            {
+                _playerSessions.Remove(peer);
+            }
+            OnPlayerDisconnected?.Invoke(peer, disconnectInfo);
         }
 
         // CRITICAL FIX: This was empty before, which is why the Server ignored the data!
@@ -89,6 +100,29 @@ namespace TTRPG.Server.Services
         {
             // Pass the raw data to the processor to convert it into a Class
             _packetProcessor.ReadAllPackets(reader, peer);
+        }
+        public void SendToAll(NetDataWriter writer, DeliveryMethod method)
+        {
+            _netManager.SendToAll(writer, method);
+        }
+
+        public void RegisterPlayerEntity(NetPeer peer, Entity entity)
+        {
+            _playerSessions[peer] = entity;
+        }
+
+        public Entity GetEntityForPeer(NetPeer peer)
+        {
+            return _playerSessions.TryGetValue(peer, out var entity) ? entity : Entity.Null;
+        }
+        private void OnMoveReceived(PlayerMovePacket packet, NetPeer peer)
+        {
+            //1. Validate Session
+            if (_playerSessions.TryGetValue(peer, out var entity))
+            {
+                // 2. Forward to Game Logic
+                OnPlayerInput?.Invoke(entity, packet.Direction);
+            }
         }
 
         // Unused but required interfaces
