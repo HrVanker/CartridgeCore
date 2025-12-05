@@ -131,5 +131,12 @@ namespace TTRPG.Client.Services
             // Optional: Route to EventBus if you want to display it on screen later
             // EventBus.PublishChatMessage(packet.Sender, packet.Message);
         }
+        public void SendChat(string text)
+        {
+            var packet = new ChatMessagePacket { Sender = "Traveler", Message = text };
+            NetDataWriter writer = new NetDataWriter();
+            _packetProcessor.Write(writer, packet);
+            _client.FirstPeer?.Send(writer, DeliveryMethod.ReliableOrdered);
+        }
     }
 }
