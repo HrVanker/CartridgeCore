@@ -18,28 +18,28 @@ namespace TTRPG.Client.Services
             _listener = new EventBasedNetListener();
             _client = new NetManager(_listener);
             _packetProcessor = new NetPacketProcessor();
-            _packetProcessor.SubscribeReusable<GameStatePacket>(OnGameStateReceived);
-            _packetProcessor.SubscribeReusable<EntityPositionPacket>(OnPositionReceived);
-
+            
             _packetProcessor.RegisterNestedType<TTRPG.Shared.Components.Position>(
-        (writer, pos) =>
-        {
-            writer.Put(pos.X);
-            writer.Put(pos.Y);
-        },
-        (reader) =>
-        {
-            return new TTRPG.Shared.Components.Position
-            {
-                X = reader.GetInt(),
-                Y = reader.GetInt()
-            };
-        }
-    );
+                (writer, pos) =>
+                {
+                    writer.Put(pos.X);
+                    writer.Put(pos.Y);
+                },
+                (reader) =>
+                {
+                    return new TTRPG.Shared.Components.Position
+                    {
+                        X = reader.GetInt(),
+                        Y = reader.GetInt()
+                    };
+                }
+            );
 
             // 1. REGISTER RESPONSE HANDLER
             // When the Server replies, this method runs
             _packetProcessor.SubscribeReusable<JoinResponsePacket>(OnJoinResponse);
+            _packetProcessor.SubscribeReusable<GameStatePacket>(OnGameStateReceived);
+            _packetProcessor.SubscribeReusable<EntityPositionPacket>(OnPositionReceived);
 
             // 2. HANDLE CONNECTION SUCCESS
             _listener.PeerConnectedEvent += peer =>
