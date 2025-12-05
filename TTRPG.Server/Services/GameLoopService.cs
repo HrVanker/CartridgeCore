@@ -38,46 +38,38 @@ namespace TTRPG.Server.Services
 
         private void HandlePlayerMove(Entity entity, MoveDirection direction)
         {
-            if (CurrentState != GameState.Exploration)
-            {
-                // In Combat, you cannot move!
-                return;
-            }
+            if (CurrentState != GameState.Exploration) return;
 
-            if (_world.Has<Position>(entity))
+            // Check if entity has required components
+            if (_world.Has<Position>(entity) && _world.Has<Zone>(entity))
             {
                 ref var pos = ref _world.Get<Position>(entity);
-                var zone = _world.Get<Zone>(entity);
 
-                // 1. Move the Player
+                // 1. RESTORED: Normal Movement for all directions
                 switch (direction)
                 {
-                    // TEST ZONES
-                    case MoveDirection.Up:
-                        // Set Zone A
-                        _world.Set(entity, new Zone { Id = "Zone_A" });
-                        Console.WriteLine($"[Debug] Entity {entity.Id} entered Zone_A");
-                        break;
-                    case MoveDirection.Down:
-                        // Set Zone B
-                        _world.Set(entity, new Zone { Id = "Zone_B" });
-                        Console.WriteLine($"[Debug] Entity {entity.Id} entered Zone_B");
-                        break;
-
-                    // Regular Movement
+                    case MoveDirection.Up: pos.Y -= 1; break;
+                    case MoveDirection.Down: pos.Y += 1; break;
                     case MoveDirection.Left: pos.X -= 1; break;
                     case MoveDirection.Right: pos.X += 1; break;
                 }
 
-                Console.WriteLine($"[GameLoop] Entity {entity.Id} moved to {pos.X}, {pos.Y}");
-                // RELEVANCY: Only broadcast to people in THIS zone
-                BroadcastPositionToZone(entity.Id, pos, zone.Id);
+                // 2. NEW: Spatial Zoning Logic
+                // If X is negative, we are in Zone_A. If X is positive, Zone_B.
+                string newZoneId = (pos.X >= 0) ? "Zone_B" : "Zone_A";
 
-                // 2. CHECK FOR ENCOUNTER
+                // Update the Zone Component
+                _world.Set(entity, new Zone { Id = newZoneId });
+
+                Console.WriteLine($"[GameLoop] Entity {entity.Id} moved to {pos.X},{pos.Y} (Zone: {newZoneId})");
+
+                // 3. Broadcast to the Specific Zone
+                BroadcastPositionToZone(entity.Id, pos, newZoneId);
+
+                // 4. Encounter Logic
                 _stepsTaken++;
                 CheckForEncounter();
             }
-
         }
 
         private void BroadcastPositionToZone(int entityId, Position pos, string zoneId)

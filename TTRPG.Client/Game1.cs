@@ -26,6 +26,7 @@ namespace TTRPG.Client
         private Color _goblinColor = Color.Red;
 
         private Color _backgroundColor = Color.CornflowerBlue; // Default Explore
+        private Texture2D? _whitePixel;
 
         //Movement
         private double _lastMoveTime;
@@ -141,24 +142,59 @@ namespace TTRPG.Client
 
         protected override void Draw(GameTime gameTime)
         {
-            // Safety checks
             if (_renderTarget == null || _spriteBatch == null) return;
 
             // --- PASS 1: Low Res World ---
             GraphicsDevice.SetRenderTarget(_renderTarget);
-            GraphicsDevice.Clear(_backgroundColor);
 
-            _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+            // We clear to Black so we can draw our own zones on top
+            GraphicsDevice.Clear(Color.Black);
 
-            var texture = _textureManager?.GetTexture("goblin");
-            if (texture != null)
+            // CAMERA TRANSFORM: Center the world on the screen
+            // This moves (0,0) from the top-left corner to the middle of the view (320, 180)
+            var centerTransform = Matrix.CreateTranslation(VIRTUAL_WIDTH / 2f, VIRTUAL_HEIGHT / 2f, 0);
+
+            _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: centerTransform);
+
+            // 1. DETERMINE COLORS (Combat vs Explore)
+            // Currently our state is global, so both turn red, but we draw them separately.
+            Color zoneAColor = (_backgroundColor == Color.CornflowerBlue) ? Color.CornflowerBlue : Color.DarkRed;
+            Color zoneBColor = (_backgroundColor == Color.CornflowerBlue) ? Color.SaddleBrown : Color.DarkRed;
+
+            // 2. DRAW ZONE A (The Blue Void)
+            // Covers X from -1000 to 0
+            // We use a 1x1 white pixel texture stretched out (or just a basic rect if you have a white texture)
+            // If you don't have a white pixel, we can assume the "Goblin" texture has a white pixel or create one.
+            // For this test, let's assume we create a 1x1 texture on the fly in Initialize or just use 'ground' tinted.
+
+            // HACK: Create a 1x1 white texture on the fly if needed (Do this in Initialize in real code)
+            if (_whitePixel == null)
             {
-                // Draw EVERY entity we know about
+                _whitePixel = new Texture2D(GraphicsDevice, 1, 1);
+                _whitePixel.SetData(new[] { Color.White });
+            }
+
+            // Draw Zone A (Left of 0)
+            _spriteBatch.Draw(_whitePixel, new Rectangle(-1000, -1000, 1000, 2000), zoneAColor);
+
+            // 3. DRAW ZONE B (The Ground)
+            // Covers X from 0 to 1000
+            // Draw Zone B (Right of 0)
+            _spriteBatch.Draw(_whitePixel, new Rectangle(0, -1000, 1000, 2000), zoneBColor);
+
+            // Optional: Draw the "Border" line at X=0
+            _spriteBatch.Draw(_whitePixel, new Rectangle(-1, -1000, 2, 2000), Color.White);
+
+
+            // 4. DRAW ENTITIES
+            var goblinTex = _textureManager?.GetTexture("goblin");
+            if (goblinTex != null)
+            {
                 foreach (var kvp in _entityPositions)
                 {
-                    // kvp.Value is the Position
-                    // Optional: We could tint them based on ID (kvp.Key) to tell them apart
-                    _spriteBatch.Draw(texture, kvp.Value, Color.White);
+                    // Draw sprite at calculated position
+                    // Since we applied the Matrix, these coordinates are now relative to the center!
+                    _spriteBatch.Draw(goblinTex, kvp.Value, Color.White);
                 }
             }
 
