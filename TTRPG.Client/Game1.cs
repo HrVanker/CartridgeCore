@@ -16,6 +16,7 @@ namespace TTRPG.Client
         private SpriteBatch? _spriteBatch;
         private RenderTarget2D? _renderTarget;
         private ClientNetworkService? _networkService;
+        private KeyboardState _lastKeyState;
 
         // Resolution Settings
         private const int VIRTUAL_WIDTH = 640;
@@ -106,60 +107,47 @@ namespace TTRPG.Client
 
         protected override void Update(GameTime gameTime)
         {
-            _currentGameTime = gameTime.TotalGameTime.TotalSeconds;
-
-            if (_networkService != null)
-            {
-                double currentTime = gameTime.TotalGameTime.TotalSeconds;
-                if (currentTime - _lastMoveTime > MOVE_DELAY)
-                {
-                    var kState = Keyboard.GetState();
-
-                    if (kState.IsKeyDown(Keys.Up))
-                    {
-                        _networkService.SendMove(Shared.Enums.MoveDirection.Up);
-                        _lastMoveTime = currentTime;
-                    }
-                    else if (kState.IsKeyDown(Keys.Down))
-                    {
-                        _networkService.SendMove(Shared.Enums.MoveDirection.Down);
-                        _lastMoveTime = currentTime;
-                    }
-                    else if (kState.IsKeyDown(Keys.Left))
-                    {
-                        _networkService.SendMove(Shared.Enums.MoveDirection.Left);
-                        _lastMoveTime = currentTime;
-                    }
-                    else if (kState.IsKeyDown(Keys.Right))
-                    {
-                        _networkService.SendMove(Shared.Enums.MoveDirection.Right);
-                        _lastMoveTime = currentTime;
-                    }
-                }
-            }
+            // 1. Exit Logic
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
 
-            // Null check required now
-            _networkService?.Poll();
+            // 2. Capture Time & Input
+            double currentTime = gameTime.TotalGameTime.TotalSeconds;
+            var kState = Keyboard.GetState();
 
-            // CLEANUP GHOSTS
-            // Create a list of IDs to remove
-            var toRemove = new System.Collections.Generic.List<int>();
-
-            foreach (var kvp in _entities)
+            if (_networkService != null)
             {
-                // If we haven't heard from this entity in 1.0 seconds, cull it.
-                if (_currentGameTime - kvp.Value.LastUpdate > 1.0)
+                // --- MOVEMENT LOGIC (Existing) ---
+                // (Only run if we passed the movement delay)
+                // ... [Your existing movement code here] ...
+
+                // --- NEW: CHAT & DM TOOLS ---
+                // Press 'T' to talk
+                if (kState.IsKeyDown(Keys.T) && _lastKeyState.IsKeyUp(Keys.T))
                 {
-                    toRemove.Add(kvp.Key);
+                    _networkService.SendChat("Hello World!");
                 }
+
+                // Press '1' to Teleport to Zone A
+                if (kState.IsKeyDown(Keys.D1) && _lastKeyState.IsKeyUp(Keys.D1))
+                {
+                    _networkService.SendChat("/tp Zone_A");
+                }
+
+                // Press '2' to Teleport to Zone B
+                if (kState.IsKeyDown(Keys.D2) && _lastKeyState.IsKeyUp(Keys.D2))
+                {
+                    _networkService.SendChat("/tp Zone_B");
+                }
+                // -----------------------------
             }
 
-            foreach (var id in toRemove)
-            {
-                _entities.Remove(id);
-            }
+            // 3. Update State for next frame
+            // This is crucial! It records what keys were down this frame
+            _lastKeyState = kState;
+
+            // 4. Poll Network
+            _networkService?.Poll();
 
             base.Update(gameTime);
         }
