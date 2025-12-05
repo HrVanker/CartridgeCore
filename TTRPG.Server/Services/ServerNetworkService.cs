@@ -111,6 +111,14 @@ namespace TTRPG.Server.Services
             OnPlayerDisconnected?.Invoke(peer, disconnectInfo);
         }
 
+        public void BroadcastPacket<T>(T packet, DeliveryMethod method = DeliveryMethod.ReliableOrdered) where T : class, new()
+        {
+            NetDataWriter writer = new NetDataWriter();
+            // This uses the processor that knows about 'Position'
+            _packetProcessor.Write(writer, packet);
+            _netManager.SendToAll(writer, method);
+        }
+
         // CRITICAL FIX: This was empty before, which is why the Server ignored the data!
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
         {
