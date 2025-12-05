@@ -75,6 +75,15 @@ namespace TTRPG.Client
                     System.Diagnostics.Debug.WriteLine("[UI] Entering Exploration Mode");
                 }
             };
+            EventBus.OnEntityMoved += (id, pos) =>
+            {
+                // For now, we assume ALL movement is "The Goblin"
+                // Later, we will check "id" to move specific monsters.
+
+                // Convert Grid Coordinate (0,0) to Pixel Coordinate (0,0)
+                // Let's assume 1 Grid Unit = 16 Pixels
+                _goblinPosition = new Vector2(pos.X * 16, pos.Y * 16);
+            };
 
             _networkService = new ClientNetworkService();
             _networkService.Connect("localhost", 9050);

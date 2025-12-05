@@ -27,6 +27,22 @@ namespace TTRPG.Server.Services
             // 1. Initialize the Packet Processor
             _packetProcessor = new NetPacketProcessor();
 
+            _packetProcessor.RegisterNestedType<TTRPG.Shared.Components.Position>(
+        (writer, pos) => // Writer
+        {
+            writer.Put(pos.X);
+            writer.Put(pos.Y);
+        },
+        (reader) => // Reader
+        {
+            return new TTRPG.Shared.Components.Position
+            {
+                X = reader.GetInt(),
+                Y = reader.GetInt()
+            };
+        }
+    );
+
             // 2. Subscribe to the JoinRequestPacket
             // When this packet arrives, run the 'OnJoinReceived' method
             _packetProcessor.SubscribeReusable<JoinRequestPacket, NetPeer>(OnJoinReceived);

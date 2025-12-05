@@ -1,5 +1,6 @@
 ﻿using System;
 using TTRPG.Shared.Enums;
+using TTRPG.Shared.Components;
 
 namespace TTRPG.Client.Systems
 {
@@ -20,6 +21,12 @@ namespace TTRPG.Client.Systems
         public static void PublishStateChanged(GameState newState)
         {
             OnGameStateChanged?.Invoke(newState);
+        }
+        public static event Action<int, Position>? OnEntityMoved;
+
+        public static void PublishEntityMoved(int entityId, Position pos)
+        {
+            OnEntityMoved?.Invoke(entityId, pos);
         }
     }
 }
