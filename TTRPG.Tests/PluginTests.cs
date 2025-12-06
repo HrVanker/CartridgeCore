@@ -8,11 +8,11 @@ namespace TTRPG.Tests;
 public class PluginTests
 {
     [Fact]
-    public void PluginLoader_ShouldLoadSampleRules_WhenDllExists()
+    public void PluginLoader_ShouldLoadPathfinderRules_WhenDllExists()
     {
         // Arrange
-        // We know the build system copies "TTRPG.Rules.Sample.dll" to our output folder
-        string dllName = "TTRPG.Rules.Sample.dll";
+        // We renamed the project, so the build output is now this:
+        string dllName = "TTRPG.Rules.Pathfinder.dll";
         string fullPath = Path.GetFullPath(dllName);
         var loader = new PluginLoader();
 
@@ -21,7 +21,9 @@ public class PluginTests
 
         // Assert
         Assert.NotNull(loadedRules);
-        Assert.Equal("Dungeons of Unit Testing", loadedRules.Name);
-        Assert.Equal("1.0.0", loadedRules.Version);
+        Assert.Equal("Pathfinder Core Rules", loadedRules.Name);
+
+        // Verify the resolver hook works
+        Assert.NotNull(loadedRules.GetResolver());
     }
 }

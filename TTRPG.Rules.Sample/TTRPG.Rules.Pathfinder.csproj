@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TTRPG.Core\TTRPG.Core.csproj" />
+    <ProjectReference Include="..\TTRPG.Shared\TTRPG.Shared.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
