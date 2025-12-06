@@ -11,10 +11,11 @@ namespace TTRPG.Client.Services
     public class TiledMapRenderer
     {
         private TiledMap _map;
-        private Dictionary<int, LoadedTileset> _tilesets; // Use our custom wrapper
+        private Dictionary<int, LoadedTileset> _tilesets;
         private TextureManager _textureManager;
         private GraphicsDevice _graphicsDevice;
 
+        // TiledMap properties are PascalCase in TiledCS, but children are lowercase
         public int PixelWidth => _map.Width * _map.TileWidth;
         public int PixelHeight => _map.Height * _map.TileHeight;
 
@@ -30,30 +31,29 @@ namespace TTRPG.Client.Services
             _map = new TiledMap(path);
             _tilesets.Clear();
 
-            // TiledCS v3 uses PascalCase for properties
+            // TiledCS maps XML tags directly, so properties are lowercase
             foreach (var mapTileset in _map.Tilesets)
             {
-                if (mapTileset.Source != null)
+                if (mapTileset.source != null)
                 {
-                    // External TSX not supported in this demo yet
+                    // External TSX not supported in this basic renderer
                     continue;
                 }
 
                 // Internal (Embedded) Tileset
-                // We extract the data we need into our custom struct
                 var loadedData = new LoadedTileset
                 {
-                    FirstGid = mapTileset.firstgrid,
-                    TileWidth = mapTileset.TileWidth,
-                    TileHeight = mapTileset.TileHeight,
-                    Columns = mapTileset.Columns,
-                    TileCount = mapTileset.TileCount,
-                    // The image property might be null if not an image tileset, 
-                    // but for our test map it exists.
-                    ImageSource = mapTileset.Image.Source
+                    // FIX: 'firstgid' (lowercase, no 'r')
+                    FirstGid = mapTileset.firstgid,
+                    TileWidth = mapTileset.tilewidth,
+                    TileHeight = mapTileset.tileheight,
+                    Columns = mapTileset.columns,
+                    TileCount = mapTileset.tilecount,
+                    // FIX: 'image' is lowercase, 'source' is lowercase
+                    ImageSource = mapTileset.image.source
                 };
 
-                _tilesets[mapTileset.FirstGid] = loadedData;
+                _tilesets[mapTileset.firstgid] = loadedData;
             }
         }
 
@@ -63,7 +63,8 @@ namespace TTRPG.Client.Services
 
             foreach (var layer in _map.Layers)
             {
-                if (layer.Type == TiledLayerType.TileLayer)
+                // FIX: 'type' is lowercase
+                if (layer.type == "tilelayer")
                 {
                     DrawTileLayer(spriteBatch, layer);
                 }
@@ -77,14 +78,15 @@ namespace TTRPG.Client.Services
                 for (int x = 0; x < _map.Width; x++)
                 {
                     int index = (y * _map.Width) + x;
-                    int gid = layer.Data[index]; // 'Data' is PascalCase in v3
+
+                    // FIX: 'data' is lowercase
+                    int gid = layer.data[index];
 
                     if (gid == 0) continue;
 
                     var tileset = GetTilesetForGid(gid);
                     if (tileset == null) continue;
 
-                    // Math to find the specific rectangle in the tileset image
                     int localId = gid - tileset.Value.FirstGid;
                     int columns = tileset.Value.Columns;
 
