@@ -1,0 +1,19 @@
+{
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string",
+            "minLength": 1
+        },
+        "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "author": { "type": "string" },
+        "dependencies": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+        }
+    },
+    "required": [ "name", "version", "author" ]
+}

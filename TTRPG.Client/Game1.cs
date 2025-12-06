@@ -290,8 +290,6 @@ namespace TTRPG.Client
                     _spriteBatch.Draw(goblinTex, kvp.Value.Position, Color.White);
                 }
             }
-
-            _spriteBatch.End();
             // DRAW TOOLTIP
             if (!string.IsNullOrEmpty(_currentTooltip))
             {
@@ -309,6 +307,9 @@ namespace TTRPG.Client
                 // Let's use the Console Output for the text, and a Yellow Box on screen to confirm visual hit.
                 _spriteBatch.Draw(_whitePixel, new Rectangle((int)_tooltipPosition.X, (int)_tooltipPosition.Y, 10, 10), Color.Yellow);
             }
+
+            _spriteBatch.End();
+
             // --- PASS 2: Upscale to Monitor ---
             GraphicsDevice.SetRenderTarget(null);
             GraphicsDevice.Clear(Color.Black);

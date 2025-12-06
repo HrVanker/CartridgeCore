@@ -200,39 +200,50 @@ namespace TTRPG.Server.Services
         {
             if (_world == null) return;
 
-            // Arch Entity IDs are just integers, but usually need a "Generation" for safety.
-            // For this phase, we assume the ID provided is valid and alive.
-            // We construct a "Unsafe" entity reference using just the ID.
-            // In a full production Arch app, we'd track Generation too.
-            var targetEntity = _world.Reference(packet.EntityId);
+            // FIX: We cannot 'new Entity(id)'.
+            // Instead, we scan the world to find the entity that matches this ID.
 
-            if (targetEntity.IsAlive())
+            Arch.Core.Entity foundEntity = Arch.Core.Entity.Null;
+
+            // Query ALL entities (Empty description matches everything)
+            var query = new Arch.Core.QueryDescription();
+
+            _world.Query(in query, (Arch.Core.Entity e) =>
             {
-                var entity = targetEntity.Entity;
-                string info = $"ID: {entity.Id}";
+                // If we found the match, capture it
+                if (e.Id == packet.EntityId)
+                {
+                    foundEntity = e;
+                }
+            });
+
+            // If foundEntity is not Null, we found it!
+            if (foundEntity != Arch.Core.Entity.Null && _world.IsAlive(foundEntity))
+            {
+                string info = $"ID: {foundEntity.Id}";
 
                 // 1. Get Health
-                if (_world.Has<TTRPG.Shared.Components.Health>(entity))
+                if (_world.Has<TTRPG.Shared.Components.Health>(foundEntity))
                 {
-                    var hp = _world.Get<TTRPG.Shared.Components.Health>(entity);
+                    var hp = _world.Get<TTRPG.Shared.Components.Health>(foundEntity);
                     info += $"\nHP: {hp.Current}/{hp.Max}";
                 }
 
                 // 2. Get Stats
-                if (_world.Has<TTRPG.Shared.Components.Stats>(entity))
+                if (_world.Has<TTRPG.Shared.Components.Stats>(foundEntity))
                 {
-                    var stats = _world.Get<TTRPG.Shared.Components.Stats>(entity);
+                    var stats = _world.Get<TTRPG.Shared.Components.Stats>(foundEntity);
                     info += $"\nSTR: {stats.Strength} AGI: {stats.Agility}";
                 }
 
                 // 3. Get Zone
-                if (_world.Has<TTRPG.Shared.Components.Zone>(entity))
+                if (_world.Has<TTRPG.Shared.Components.Zone>(foundEntity))
                 {
-                    var zone = _world.Get<TTRPG.Shared.Components.Zone>(entity);
+                    var zone = _world.Get<TTRPG.Shared.Components.Zone>(foundEntity);
                     info += $"\nZone: {zone.Id}";
                 }
 
-                // 4. Send Reply (Private message to the requester)
+                // 4. Send Reply
                 var response = new EntityDetailsPacket
                 {
                     EntityId = packet.EntityId,
@@ -243,7 +254,11 @@ namespace TTRPG.Server.Services
                 _packetProcessor.Write(writer, response);
                 peer.Send(writer, DeliveryMethod.ReliableOrdered);
 
-                Console.WriteLine($"[Inspector] Sent details for Entity {entity.Id} to Peer {peer.Id}");
+                Console.WriteLine($"[Inspector] Sent details for Entity {foundEntity.Id} to Peer {peer.Id}");
+            }
+            else
+            {
+                Console.WriteLine($"[Inspector] Entity {packet.EntityId} not found or dead.");
             }
         }
     }
