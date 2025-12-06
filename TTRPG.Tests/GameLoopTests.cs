@@ -18,6 +18,7 @@ namespace TTRPG.Tests
             var network = new ServerNetworkService();
             network.Start(0); // FIX: Start network to initialize internals
             network.SetWorld(world);
+            var mapService = new MapService();
 
             var notifications = new NotificationService(network, world);
             var gameLoop = new GameLoopService(network, world, notifications, mapService);
@@ -51,6 +52,7 @@ namespace TTRPG.Tests
             var network = new ServerNetworkService();
             network.Start(0); // FIX: Start network
             network.SetWorld(world);
+            var mapService = new MapService();
 
             var notifications = new NotificationService(network, world);
             var gameLoop = new GameLoopService(network, world, notifications, mapService);
@@ -77,6 +79,9 @@ namespace TTRPG.Tests
             network.Stop();
             World.Destroy(world);
         }
+        // Add MapService to the setup in existing tests
+        // And add this NEW test:
+
         [Fact]
         public void Move_ShouldBeBlocked_WhenWallExists()
         {
@@ -91,17 +96,17 @@ namespace TTRPG.Tests
             // We can write a temp file or just subclass/mock MapService if we made it virtual.
             // For simplicity, we'll write a temp TMX again.
             string mapXml = @"<?xml version=""1.0"" encoding=""UTF-8""?>
-            <map version=""1.10"" width=""5"" height=""5"" tilewidth=""16"" tileheight=""16"">
-            <layer id=""1"" name=""Collisions"" width=""5"" height=""5"">
-            <data encoding=""csv"">
-            0,1,0,0,0,
-            0,0,0,0,0,
-            0,0,0,0,0,
-            0,0,0,0,0,
-            0,0,0,0,0
-            </data>
-            </layer>
-            </map>";
+<map version=""1.10"" width=""5"" height=""5"" tilewidth=""16"" tileheight=""16"">
+ <layer id=""1"" name=""Collisions"" width=""5"" height=""5"">
+  <data encoding=""csv"">
+0,1,0,0,0,
+0,0,0,0,0,
+0,0,0,0,0,
+0,0,0,0,0,
+0,0,0,0,0
+</data>
+ </layer>
+</map>";
             string tempPath = System.IO.Path.GetTempFileName();
             System.IO.File.WriteAllText(tempPath, mapXml);
             mapService.LoadMap(tempPath);
