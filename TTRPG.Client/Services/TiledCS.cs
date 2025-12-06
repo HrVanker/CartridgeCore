@@ -5,7 +5,6 @@ using System.Xml.Serialization;
 
 namespace TiledCS
 {
-    // A custom, lightweight parser tailored for CartridgeCore's Embedded Tilesets
     [XmlRoot("map")]
     public class TiledMap
     {
@@ -14,8 +13,9 @@ namespace TiledCS
         [XmlAttribute("tilewidth")] public int TileWidth { get; set; }
         [XmlAttribute("tileheight")] public int TileHeight { get; set; }
 
-        [XmlElement("tileset")] public List<TiledMapTileset> Tilesets { get; set; }
-        [XmlElement("layer")] public List<TiledLayer> Layers { get; set; }
+        // Initialize lists to avoid null warnings
+        [XmlElement("tileset")] public List<TiledMapTileset> Tilesets { get; set; } = new();
+        [XmlElement("layer")] public List<TiledLayer> Layers { get; set; } = new();
 
         public TiledMap() { }
         public TiledMap(string path)
@@ -23,34 +23,36 @@ namespace TiledCS
             var serializer = new XmlSerializer(typeof(TiledMap));
             using (var stream = new FileStream(path, FileMode.Open))
             {
-                var map = (TiledMap)serializer.Deserialize(stream);
-                this.Width = map.Width;
-                this.Height = map.Height;
-                this.TileWidth = map.TileWidth;
-                this.TileHeight = map.TileHeight;
-                this.Tilesets = map.Tilesets;
-                this.Layers = map.Layers;
+                var map = (TiledMap?)serializer.Deserialize(stream);
+                if (map != null)
+                {
+                    this.Width = map.Width;
+                    this.Height = map.Height;
+                    this.TileWidth = map.TileWidth;
+                    this.TileHeight = map.TileHeight;
+                    this.Tilesets = map.Tilesets;
+                    this.Layers = map.Layers;
+                }
             }
         }
     }
 
     public class TiledMapTileset
     {
-        // These are the properties the NuGet package was missing!
         [XmlAttribute("firstgid")] public int FirstGid { get; set; }
-        [XmlAttribute("name")] public string Name { get; set; }
+        [XmlAttribute("name")] public string Name { get; set; } = string.Empty;
         [XmlAttribute("tilewidth")] public int TileWidth { get; set; }
         [XmlAttribute("tileheight")] public int TileHeight { get; set; }
         [XmlAttribute("tilecount")] public int TileCount { get; set; }
         [XmlAttribute("columns")] public int Columns { get; set; }
-        [XmlAttribute("source")] public string Source { get; set; }
+        [XmlAttribute("source")] public string? Source { get; set; } // Nullable because embedded tilesets don't have source
 
-        [XmlElement("image")] public TiledImage Image { get; set; }
+        [XmlElement("image")] public TiledImage? Image { get; set; } // Nullable
     }
 
     public class TiledImage
     {
-        [XmlAttribute("source")] public string Source { get; set; }
+        [XmlAttribute("source")] public string Source { get; set; } = string.Empty;
         [XmlAttribute("width")] public int Width { get; set; }
         [XmlAttribute("height")] public int Height { get; set; }
     }
@@ -58,20 +60,18 @@ namespace TiledCS
     public class TiledLayer
     {
         [XmlAttribute("id")] public int Id { get; set; }
-        [XmlAttribute("name")] public string Name { get; set; }
+        [XmlAttribute("name")] public string Name { get; set; } = string.Empty;
         [XmlAttribute("width")] public int Width { get; set; }
         [XmlAttribute("height")] public int Height { get; set; }
+        [XmlAttribute("type")] public string Type { get; set; } = string.Empty;
 
-        // We use string here to avoid Enum parsing headaches
-        [XmlAttribute("type")] public string Type { get; set; }
-
-        [XmlElement("data")] public TiledData Data { get; set; }
+        [XmlElement("data")] public TiledData? Data { get; set; }
     }
 
     public class TiledData
     {
-        [XmlAttribute("encoding")] public string Encoding { get; set; }
-        [XmlText] public string Value { get; set; }
+        [XmlAttribute("encoding")] public string Encoding { get; set; } = string.Empty;
+        [XmlText] public string Value { get; set; } = string.Empty;
 
         public int[] Tiles
         {
@@ -84,7 +84,7 @@ namespace TiledCS
                         int.Parse
                     );
                 }
-                return new int[0];
+                return Array.Empty<int>();
             }
         }
     }

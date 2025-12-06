@@ -5,7 +5,6 @@ using Microsoft.Xna.Framework.Input;
 using TTRPG.Client.Services;
 using System.IO;
 using TTRPG.Client.Systems;
-using TTRPG.Client.Services; // Ensure this is there
 
 namespace TTRPG.Client
 {
@@ -109,6 +108,8 @@ namespace TTRPG.Client
         protected override void LoadContent()
         {
             _spriteBatch = new SpriteBatch(GraphicsDevice);
+            _whitePixel = new Texture2D(GraphicsDevice, 1, 1);
+            _whitePixel.SetData(new[] { Color.White });
 
             // 1. Initialize Texture Manager
             _textureManager = new TextureManager(GraphicsDevice);

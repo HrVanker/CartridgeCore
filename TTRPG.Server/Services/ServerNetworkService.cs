@@ -156,7 +156,7 @@ namespace TTRPG.Server.Services
                 OnPlayerInput?.Invoke(session.Entity, packet.Direction);
             }
         }
-        private Arch.Core.World _world;
+        private Arch.Core.World? _world;
 
         // Add Method to inject it (Call this from Program.cs)
         public void SetWorld(Arch.Core.World world)

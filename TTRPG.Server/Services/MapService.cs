@@ -7,7 +7,7 @@ namespace TTRPG.Server.Services
 {
     public class MapService
     {
-        private bool[,] _collisionGrid;
+        private bool[,]? _collisionGrid;
         public int Width { get; private set; }
         public int Height { get; private set; }
 

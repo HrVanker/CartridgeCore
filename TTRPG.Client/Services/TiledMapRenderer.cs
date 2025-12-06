@@ -8,13 +8,15 @@ namespace TTRPG.Client.Services
 {
     public class TiledMapRenderer
     {
-        private TiledMap _map;
-        private Dictionary<int, TiledMapTileset> _tilesets;
+        // 1. Make nullable
+        private TiledMap? _map;
+        private Dictionary<int, LoadedTileset> _tilesets;
         private TextureManager _textureManager;
         private GraphicsDevice _graphicsDevice;
 
-        public int PixelWidth => _map.Width * _map.TileWidth;
-        public int PixelHeight => _map.Height * _map.TileHeight;
+        // 2. Use null-conditional operator (?.) and coalescing (??)
+        public int PixelWidth => _map?.Width * _map?.TileWidth ?? 0;
+        public int PixelHeight => _map?.Height * _map?.TileHeight ?? 0;
 
         public TiledMapRenderer(GraphicsDevice graphicsDevice, TextureManager textureManager)
         {
