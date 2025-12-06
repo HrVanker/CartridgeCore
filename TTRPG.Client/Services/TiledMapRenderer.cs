@@ -43,7 +43,7 @@ namespace TTRPG.Client.Services
                 // We extract the data we need into our custom struct
                 var loadedData = new LoadedTileset
                 {
-                    FirstGid = mapTileset.FirstGid,
+                    FirstGid = mapTileset.firstgrid,
                     TileWidth = mapTileset.TileWidth,
                     TileHeight = mapTileset.TileHeight,
                     Columns = mapTileset.Columns,
