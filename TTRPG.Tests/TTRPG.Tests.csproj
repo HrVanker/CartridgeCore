@@ -20,6 +20,12 @@
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
+  <ItemGroup>
+		<None Include="..\TTRPG.Server\Data\test_map.tmx">
+			<Link>test_map.tmx</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TTRPG.Server\TTRPG.Server.csproj" />
