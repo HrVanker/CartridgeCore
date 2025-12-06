@@ -2,19 +2,18 @@
 using System.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using TiledCS; // This now refers to your local file
+using TiledCS; // This references TiledCS.cs, NOT the NuGet package
 
 namespace TTRPG.Client.Services
 {
     public class TiledMapRenderer
     {
-        // 1. Make nullable
         private TiledMap? _map;
         private Dictionary<int, LoadedTileset> _tilesets;
         private TextureManager _textureManager;
         private GraphicsDevice _graphicsDevice;
 
-        // 2. Use null-conditional operator (?.) and coalescing (??)
+        // Use Null Coalescing for safety
         public int PixelWidth => _map?.Width * _map?.TileWidth ?? 0;
         public int PixelHeight => _map?.Height * _map?.TileHeight ?? 0;
 
@@ -22,7 +21,7 @@ namespace TTRPG.Client.Services
         {
             _graphicsDevice = graphicsDevice;
             _textureManager = textureManager;
-            _tilesets = new Dictionary<int, TiledMapTileset>();
+            _tilesets = new Dictionary<int, LoadedTileset>();
         }
 
         public void LoadMap(string path)
@@ -32,10 +31,18 @@ namespace TTRPG.Client.Services
 
             foreach (var tileset in _map.Tilesets)
             {
-                // Our local parser guarantees these properties exist!
-                if (string.IsNullOrEmpty(tileset.Source))
+                // Safety check: Only process tilesets with an image (Embedded)
+                if (string.IsNullOrEmpty(tileset.Source) && tileset.Image != null)
                 {
-                    _tilesets[tileset.FirstGid] = tileset;
+                    var loaded = new LoadedTileset
+                    {
+                        FirstGid = tileset.FirstGid,
+                        TileWidth = tileset.TileWidth,
+                        TileHeight = tileset.TileHeight,
+                        Columns = tileset.Columns,
+                        ImageSource = tileset.Image.Source
+                    };
+                    _tilesets[tileset.FirstGid] = loaded;
                 }
             }
         }
@@ -46,7 +53,6 @@ namespace TTRPG.Client.Services
 
             foreach (var layer in _map.Layers)
             {
-                // Our custom parser returns the tiles array directly via the getter
                 if (layer.Data != null)
                 {
                     DrawLayer(spriteBatch, layer);
@@ -56,11 +62,9 @@ namespace TTRPG.Client.Services
 
         private void DrawLayer(SpriteBatch spriteBatch, TiledLayer layer)
         {
-            if (_map == null) return;
+            var tileData = layer.Data!.Tiles;
 
-            var tileData = layer.Data.Tiles;
-
-            for (int y = 0; y < _map.Height; y++)
+            for (int y = 0; y < _map!.Height; y++)
             {
                 for (int x = 0; x < _map.Width; x++)
                 {
@@ -73,22 +77,22 @@ namespace TTRPG.Client.Services
                     var tileset = GetTilesetForGid(gid);
                     if (tileset == null) continue;
 
-                    int localId = gid - tileset.FirstGid;
-                    int columns = tileset.Columns;
+                    var ts = tileset.Value; // Unpack struct
+                    int localId = gid - ts.FirstGid;
 
-                    int tileX = localId % columns;
-                    int tileY = localId / columns;
+                    int tileX = localId % ts.Columns;
+                    int tileY = localId / ts.Columns;
 
                     var sourceRect = new Rectangle(
-                        tileX * _map.TileWidth,
-                        tileY * _map.TileHeight,
-                        _map.TileWidth,
-                        _map.TileHeight
+                        tileX * ts.TileWidth,
+                        tileY * ts.TileHeight,
+                        ts.TileWidth,
+                        ts.TileHeight
                     );
 
-                    var destPos = new Vector2(x * _map.TileWidth, y * _map.TileHeight);
+                    var destPos = new Vector2(x * ts.TileWidth, y * ts.TileHeight);
 
-                    string textureName = Path.GetFileNameWithoutExtension(tileset.Image.Source);
+                    string textureName = Path.GetFileNameWithoutExtension(ts.ImageSource);
                     var texture = _textureManager.GetTexture(textureName);
 
                     if (texture != null)
@@ -99,9 +103,9 @@ namespace TTRPG.Client.Services
             }
         }
 
-        private TiledMapTileset GetTilesetForGid(int gid)
+        private LoadedTileset? GetTilesetForGid(int gid)
         {
-            TiledMapTileset bestMatch = null;
+            LoadedTileset? bestMatch = null;
             int maxFirstGid = -1;
 
             foreach (var kvp in _tilesets)
@@ -113,6 +117,16 @@ namespace TTRPG.Client.Services
                 }
             }
             return bestMatch;
+        }
+
+        // --- STRUCT DEFINITION MUST BE HERE ---
+        private struct LoadedTileset
+        {
+            public int FirstGid;
+            public int TileWidth;
+            public int TileHeight;
+            public int Columns;
+            public string ImageSource;
         }
     }
 }
