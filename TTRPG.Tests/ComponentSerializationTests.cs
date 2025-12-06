@@ -8,6 +8,7 @@ using TTRPG.Shared.DTOs;
 
 namespace TTRPG.Tests
 {
+    [Collection("Sequential")]
     public class ComponentSerializationTests
     {
         [Fact]

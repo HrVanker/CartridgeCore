@@ -5,6 +5,8 @@ using Microsoft.Xna.Framework.Input;
 using TTRPG.Client.Services;
 using System.IO;
 using TTRPG.Client.Systems;
+using TTRPG.Client.Services; // Ensure this is there
+private TiledMapRenderer? _mapRenderer;
 
 namespace TTRPG.Client
 {
@@ -109,11 +111,25 @@ namespace TTRPG.Client
         {
             _spriteBatch = new SpriteBatch(GraphicsDevice);
 
-            // 1. Initialize Manager
+            // 1. Initialize Texture Manager
             _textureManager = new TextureManager(GraphicsDevice);
+            _textureManager.LoadContent(); // Loads 'goblin', 'ground', etc.
 
-            // 2. Load ALL assets found in the folder
-            _textureManager.LoadContent();
+            // 2. Initialize Map Renderer
+            _mapRenderer = new TiledMapRenderer(GraphicsDevice, _textureManager);
+
+            try
+            {
+                // Load the map we copied to the output folder
+                // Use Path.Combine to be OS-safe
+                string mapPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Content", "test_map.tmx");
+                _mapRenderer.LoadMap(mapPath);
+                System.Diagnostics.Debug.WriteLine("[Client] Map Loaded via TiledCS!");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Client] Map Error: {ex.Message}");
+            }
         }
 
         protected override void Update(GameTime gameTime)
@@ -242,6 +258,7 @@ namespace TTRPG.Client
             GraphicsDevice.SetRenderTarget(_renderTarget);
 
             // We clear to Black so we can draw our own zones on top
+            GraphicsDevice.SetRenderTarget(_renderTarget);
             GraphicsDevice.Clear(Color.Black);
 
             // CAMERA TRANSFORM: Center the world on the screen
@@ -286,7 +303,6 @@ namespace TTRPG.Client
             {
                 foreach (var kvp in _entities)
                 {
-                    // kvp.Value is now the struct, so access .Position
                     _spriteBatch.Draw(goblinTex, kvp.Value.Position, Color.White);
                 }
             }
