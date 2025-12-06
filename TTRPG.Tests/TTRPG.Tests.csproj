@@ -24,7 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\TTRPG.Server\TTRPG.Server.csproj" />
     <ProjectReference Include="..\TTRPG.Core\TTRPG.Core.csproj" />
-    <ProjectReference Include="..\TTRPG.Rules.Sample\TTRPG.Rules.Sample.csproj" />
+    <ProjectReference Include="..\TTRPG.Rules.Sample\TTRPG.Rules.Pathfinder.csproj" />
     <ProjectReference Include="..\TTRPG.Client\TTRPG.Client.csproj" />
   </ItemGroup>
 

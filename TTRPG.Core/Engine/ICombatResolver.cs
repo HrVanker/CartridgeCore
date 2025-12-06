@@ -8,6 +8,8 @@ namespace TTRPG.Core.Engine
         /// Pure function: Reads the World state and calculates the outcome of an attack.
         /// Does NOT modify the World directly.
         /// </summary>
-        CombatResult ResolveAttack(World world, Entity attacker, Entity defender);
+        /// <param name="world">Read-only access to component data</param>
+        /// <param name="request">The context of the attack (Who, Whom, How)</param>
+        CombatResult ResolveAttack(World world, CombatRequest request);
     }
 }
