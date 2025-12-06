@@ -2,8 +2,8 @@
   name: "Goblin Grunt"
   components:
     Position: 
-      x: 0
-      y: 0
+      x: 2
+      y: 2
     Health: 
       current: 30
       max: 30

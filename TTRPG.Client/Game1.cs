@@ -255,71 +255,34 @@ namespace TTRPG.Client
 
             // --- PASS 1: Low Res World ---
             GraphicsDevice.SetRenderTarget(_renderTarget);
-
-            // We clear to Black so we can draw our own zones on top
-            GraphicsDevice.SetRenderTarget(_renderTarget);
             GraphicsDevice.Clear(Color.Black);
 
             // CAMERA TRANSFORM: Center the world on the screen
-            // This moves (0,0) from the top-left corner to the middle of the view (320, 180)
             var centerTransform = Matrix.CreateTranslation(VIRTUAL_WIDTH / 2f, VIRTUAL_HEIGHT / 2f, 0);
 
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: centerTransform);
 
-            // 1. DETERMINE COLORS (Combat vs Explore)
-            // Currently our state is global, so both turn red, but we draw them separately.
-            Color zoneAColor = (_backgroundColor == Color.CornflowerBlue) ? Color.CornflowerBlue : Color.DarkRed;
-            Color zoneBColor = (_backgroundColor == Color.CornflowerBlue) ? Color.SaddleBrown : Color.DarkRed;
+            // 1. DRAW MAP (New!)
+            // We pass the transform so the map is drawn relative to the camera center
+            _mapRenderer?.Draw(_spriteBatch, centerTransform);
 
-            // 2. DRAW ZONE A (The Blue Void)
-            // Covers X from -1000 to 0
-            // We use a 1x1 white pixel texture stretched out (or just a basic rect if you have a white texture)
-            // If you don't have a white pixel, we can assume the "Goblin" texture has a white pixel or create one.
-            // For this test, let's assume we create a 1x1 texture on the fly in Initialize or just use 'ground' tinted.
+            // (Removed the old Zone A / Zone B debug rectangles here)
 
-            // HACK: Create a 1x1 white texture on the fly if needed (Do this in Initialize in real code)
-            if (_whitePixel == null)
-            {
-                _whitePixel = new Texture2D(GraphicsDevice, 1, 1);
-                _whitePixel.SetData(new[] { Color.White });
-            }
-
-            // Draw Zone A (Left of 0)
-            _spriteBatch.Draw(_whitePixel, new Rectangle(-1000, -1000, 1000, 2000), zoneAColor);
-
-            // 3. DRAW ZONE B (The Ground)
-            // Covers X from 0 to 1000
-            // Draw Zone B (Right of 0)
-            _spriteBatch.Draw(_whitePixel, new Rectangle(0, -1000, 1000, 2000), zoneBColor);
-
-            // Optional: Draw the "Border" line at X=0
-            _spriteBatch.Draw(_whitePixel, new Rectangle(-1, -1000, 2, 2000), Color.White);
-
-
-            // 4. DRAW ENTITIES
+            // 2. DRAW ENTITIES
             var goblinTex = _textureManager?.GetTexture("goblin");
             if (goblinTex != null)
             {
                 foreach (var kvp in _entities)
                 {
+                    // Draw the entity
                     _spriteBatch.Draw(goblinTex, kvp.Value.Position, Color.White);
                 }
             }
-            // DRAW TOOLTIP
+
+            // 3. DRAW TOOLTIP (Existing)
             if (!string.IsNullOrEmpty(_currentTooltip))
             {
-                // Draw a simple black box background
-                // Ideally measure string size, but we'll use a fixed box for the test
                 _spriteBatch.Draw(_whitePixel, new Rectangle((int)_tooltipPosition.X, (int)_tooltipPosition.Y, 120, 60), Color.Black * 0.8f);
-
-                // Draw Text
-                // Since we don't have a SpriteFont loaded, we must use a debug method OR load a font.
-                // CRITICAL: MonoGame crashes if you DrawString without a Font.
-                // FOR THIS TEST: We will print to Debug Console unless you have a SpriteFont.
-                // Assuming NO FONT: We draw colored squares to represent data or just use the Console.
-
-                // ... Wait, do we have a font? No. 
-                // Let's use the Console Output for the text, and a Yellow Box on screen to confirm visual hit.
                 _spriteBatch.Draw(_whitePixel, new Rectangle((int)_tooltipPosition.X, (int)_tooltipPosition.Y, 10, 10), Color.Yellow);
             }
 

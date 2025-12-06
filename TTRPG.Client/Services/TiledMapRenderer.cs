@@ -1,21 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using TiledCS;
+using TiledCS; // This now refers to your local file
 
 namespace TTRPG.Client.Services
 {
     public class TiledMapRenderer
     {
         private TiledMap _map;
-        private Dictionary<int, LoadedTileset> _tilesets;
+        private Dictionary<int, TiledMapTileset> _tilesets;
         private TextureManager _textureManager;
         private GraphicsDevice _graphicsDevice;
 
-        // TiledMap properties are PascalCase in TiledCS, but children are lowercase
         public int PixelWidth => _map.Width * _map.TileWidth;
         public int PixelHeight => _map.Height * _map.TileHeight;
 
@@ -23,7 +20,7 @@ namespace TTRPG.Client.Services
         {
             _graphicsDevice = graphicsDevice;
             _textureManager = textureManager;
-            _tilesets = new Dictionary<int, LoadedTileset>();
+            _tilesets = new Dictionary<int, TiledMapTileset>();
         }
 
         public void LoadMap(string path)
@@ -31,29 +28,13 @@ namespace TTRPG.Client.Services
             _map = new TiledMap(path);
             _tilesets.Clear();
 
-            // TiledCS maps XML tags directly, so properties are lowercase
-            foreach (var mapTileset in _map.Tilesets)
+            foreach (var tileset in _map.Tilesets)
             {
-                if (mapTileset.source != null)
+                // Our local parser guarantees these properties exist!
+                if (string.IsNullOrEmpty(tileset.Source))
                 {
-                    // External TSX not supported in this basic renderer
-                    continue;
+                    _tilesets[tileset.FirstGid] = tileset;
                 }
-
-                // Internal (Embedded) Tileset
-                var loadedData = new LoadedTileset
-                {
-                    // FIX: 'firstgid' (lowercase, no 'r')
-                    FirstGid = mapTileset.firstgid,
-                    TileWidth = mapTileset.tilewidth,
-                    TileHeight = mapTileset.tileheight,
-                    Columns = mapTileset.columns,
-                    TileCount = mapTileset.tilecount,
-                    // FIX: 'image' is lowercase, 'source' is lowercase
-                    ImageSource = mapTileset.image.source
-                };
-
-                _tilesets[mapTileset.firstgid] = loadedData;
             }
         }
 
@@ -63,32 +44,33 @@ namespace TTRPG.Client.Services
 
             foreach (var layer in _map.Layers)
             {
-                // FIX: 'type' is lowercase
-                if (layer.type == "tilelayer")
+                // Our custom parser returns the tiles array directly via the getter
+                if (layer.Data != null)
                 {
-                    DrawTileLayer(spriteBatch, layer);
+                    DrawLayer(spriteBatch, layer);
                 }
             }
         }
 
-        private void DrawTileLayer(SpriteBatch spriteBatch, TiledLayer layer)
+        private void DrawLayer(SpriteBatch spriteBatch, TiledLayer layer)
         {
+            var tileData = layer.Data.Tiles;
+
             for (int y = 0; y < _map.Height; y++)
             {
                 for (int x = 0; x < _map.Width; x++)
                 {
                     int index = (y * _map.Width) + x;
+                    if (index >= tileData.Length) continue;
 
-                    // FIX: 'data' is lowercase
-                    int gid = layer.data[index];
-
+                    int gid = tileData[index];
                     if (gid == 0) continue;
 
                     var tileset = GetTilesetForGid(gid);
                     if (tileset == null) continue;
 
-                    int localId = gid - tileset.Value.FirstGid;
-                    int columns = tileset.Value.Columns;
+                    int localId = gid - tileset.FirstGid;
+                    int columns = tileset.Columns;
 
                     int tileX = localId % columns;
                     int tileY = localId / columns;
@@ -102,7 +84,7 @@ namespace TTRPG.Client.Services
 
                     var destPos = new Vector2(x * _map.TileWidth, y * _map.TileHeight);
 
-                    string textureName = Path.GetFileNameWithoutExtension(tileset.Value.ImageSource);
+                    string textureName = Path.GetFileNameWithoutExtension(tileset.Image.Source);
                     var texture = _textureManager.GetTexture(textureName);
 
                     if (texture != null)
@@ -113,9 +95,9 @@ namespace TTRPG.Client.Services
             }
         }
 
-        private LoadedTileset? GetTilesetForGid(int gid)
+        private TiledMapTileset GetTilesetForGid(int gid)
         {
-            LoadedTileset? bestMatch = null;
+            TiledMapTileset bestMatch = null;
             int maxFirstGid = -1;
 
             foreach (var kvp in _tilesets)
@@ -127,17 +109,6 @@ namespace TTRPG.Client.Services
                 }
             }
             return bestMatch;
-        }
-
-        // Custom internal wrapper to avoid modifying TiledCS classes
-        private struct LoadedTileset
-        {
-            public int FirstGid;
-            public int TileWidth;
-            public int TileHeight;
-            public int Columns;
-            public int TileCount;
-            public string ImageSource;
         }
     }
 }
