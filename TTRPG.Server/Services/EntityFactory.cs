@@ -84,28 +84,38 @@ namespace TTRPG.Server.Services
 
         private void SetOrAddComponent(World world, Entity entity, object component, Type componentType)
         {
-            // 1. Find the correct "Set" method.
-            // We must filter specifically for Set<T>(Entity, T) to avoid grabbing Set(QueryDescription, ...)
-            var setMethod = typeof(World).GetMethods()
-                .FirstOrDefault(m =>
-                    m.Name == "Set" &&
-                    m.IsGenericMethod &&
-                    m.GetParameters().Length == 2 &&
-                    // Arch uses 'in Entity', which usually shows up as ByRef in reflection
-                    (m.GetParameters()[0].ParameterType == typeof(Entity) ||
-                     m.GetParameters()[0].ParameterType == typeof(Entity).MakeByRefType())
-                );
+            // 1. Define match criteria for the Entity parameter (can be "Entity" or "ref Entity")
+            bool IsEntityParam(ParameterInfo p) =>
+                p.ParameterType == typeof(Entity) ||
+                p.ParameterType == typeof(Entity).MakeByRefType();
 
-            if (setMethod == null)
-            {
-                throw new MissingMethodException($"Could not find World.Set<{componentType.Name}>(Entity, ...)");
-            }
+            // 2. Find "Has<T>(Entity)"
+            var hasMethod = typeof(World).GetMethods()
+                .FirstOrDefault(m => m.Name == "Has" &&
+                                     m.IsGenericMethod &&
+                                     m.GetParameters().Length == 1 &&
+                                     IsEntityParam(m.GetParameters()[0]));
 
-            // 2. Make the generic method specific to the component type (e.g., Set<Health>)
-            var genericMethod = setMethod.MakeGenericMethod(componentType);
+            if (hasMethod == null) throw new MissingMethodException($"Could not find World.Has<{componentType.Name}>(Entity)");
 
-            // 3. Invoke it
-            genericMethod.Invoke(world, new object[] { entity, component });
+            // 3. Check if the entity already has the component
+            var hasGeneric = hasMethod.MakeGenericMethod(componentType);
+            bool alreadyHasComponent = (bool)hasGeneric.Invoke(world, new object[] { entity })!;
+
+            // 4. Select "Set<T>" or "Add<T>" based on existence
+            string methodName = alreadyHasComponent ? "Set" : "Add";
+
+            var actionMethod = typeof(World).GetMethods()
+                .FirstOrDefault(m => m.Name == methodName &&
+                                     m.IsGenericMethod &&
+                                     m.GetParameters().Length == 2 &&
+                                     IsEntityParam(m.GetParameters()[0]));
+
+            if (actionMethod == null) throw new MissingMethodException($"Could not find World.{methodName}<{componentType.Name}>(Entity, Component)");
+
+            // 5. Invoke the correct method
+            var actionGeneric = actionMethod.MakeGenericMethod(componentType);
+            actionGeneric.Invoke(world, new object[] { entity, component });
         }
 
         private object CreateComponentFromData(Type type, Dictionary<string, object> data)
