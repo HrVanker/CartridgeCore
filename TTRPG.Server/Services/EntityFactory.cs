@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection; // Required for the fix
 using Arch.Core;
 using Arch.Core.Extensions;
 using TTRPG.Core;
@@ -13,17 +14,19 @@ namespace TTRPG.Server.Services
         private readonly Dictionary<string, EntityBlueprint> _blueprints;
         private readonly Dictionary<string, Type> _componentRegistry;
 
+        // Cache MethodInfos to improve performance (optional but good practice)
+        private static readonly MethodInfo _setMethodTemplate = typeof(World).GetMethods()
+            .First(m => m.Name == "Set" && m.IsGenericMethod && m.GetParameters().Length == 2);
+
+        private static readonly MethodInfo _addMethodTemplate = typeof(World).GetMethods()
+            .First(m => m.Name == "Add" && m.IsGenericMethod && m.GetParameters().Length == 2);
+
         public EntityFactory(List<EntityBlueprint> blueprints)
         {
             _blueprints = blueprints.ToDictionary(b => b.Id);
             _componentRegistry = new Dictionary<string, Type>();
 
-            // AUTO-DISCOVERY: Find all structs in TTRPG.Shared.Components
-            // We find the assembly using a known component type (e.g., Position)
-            // Note: Since we haven't added specific using TTRPG.Shared.Components here, 
-            // ensure at least one component is referenced or known, 
-            // OR we iterate the assembly more dynamically. 
-            // For safety, let's assume TTRPG.Shared is loaded.
+            // AUTO-DISCOVERY
             var assembly = typeof(TTRPG.Shared.Components.Position).Assembly;
 
             foreach (var type in assembly.GetTypes())
@@ -46,13 +49,11 @@ namespace TTRPG.Server.Services
             var entity = world.Create();
             Console.WriteLine($"[Factory] Spawning Base: {blueprintId}...");
 
-            // Pass the 'world' to the template applicator
             ApplyTemplate(entity, blueprintId, world);
 
             return entity;
         }
 
-        // UPDATED SIGNATURE: Accepts 'World'
         public void ApplyTemplate(Entity entity, string templateId, World world)
         {
             if (!_blueprints.TryGetValue(templateId, out var blueprint))
@@ -72,28 +73,39 @@ namespace TTRPG.Server.Services
                 {
                     object newComponentData = CreateComponentFromData(compType, compData);
 
-                    // DEBUG: Verify parsing
-                    if (compName == "Stats")
-                    {
-                        var stats = (TTRPG.Shared.Components.Stats)newComponentData;
-                        Console.WriteLine($"  -> Merging Stats: Str {stats.Strength}, Agi {stats.Agility}");
-                    }
-
-                    // --- FIX IS HERE ---
-                    // Use 'world' to check/remove/add components
-                    if (world.Has(entity, compType))
-                    {
-                        world.Set(entity, newComponentData);
-                    }
-                    else
-                    {
-                        world.Add(entity, newComponentData);
-                    }
-
-                    // Add the new component
-                    world.Add(entity, newComponentData);
+                    // FIX: Use Reflection to invoke the Generic Set<T> / Add<T> methods.
+                    // This forces the Runtime to unbox the 'object' into the actual Struct 
+                    // before handing it to Arch. This prevents InvalidCastExceptions 
+                    // caused by trying to shove a Boxed Object into a Struct Array.
+                    SetOrAddComponent(world, entity, newComponentData, compType);
                 }
             }
+        }
+
+        private void SetOrAddComponent(World world, Entity entity, object component, Type componentType)
+        {
+            // 1. Find the correct "Set" method.
+            // We must filter specifically for Set<T>(Entity, T) to avoid grabbing Set(QueryDescription, ...)
+            var setMethod = typeof(World).GetMethods()
+                .FirstOrDefault(m =>
+                    m.Name == "Set" &&
+                    m.IsGenericMethod &&
+                    m.GetParameters().Length == 2 &&
+                    // Arch uses 'in Entity', which usually shows up as ByRef in reflection
+                    (m.GetParameters()[0].ParameterType == typeof(Entity) ||
+                     m.GetParameters()[0].ParameterType == typeof(Entity).MakeByRefType())
+                );
+
+            if (setMethod == null)
+            {
+                throw new MissingMethodException($"Could not find World.Set<{componentType.Name}>(Entity, ...)");
+            }
+
+            // 2. Make the generic method specific to the component type (e.g., Set<Health>)
+            var genericMethod = setMethod.MakeGenericMethod(componentType);
+
+            // 3. Invoke it
+            genericMethod.Invoke(world, new object[] { entity, component });
         }
 
         private object CreateComponentFromData(Type type, Dictionary<string, object> data)
