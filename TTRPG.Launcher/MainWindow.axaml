@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:dto="clr-namespace:TTRPG.Shared.DTOs;assembly=TTRPG.Shared"
         x:Class="TTRPG.Launcher.MainWindow"
         Title="Cartridge Core Launcher" Width="800" Height="450"
         Background="#2D2D30">
@@ -8,7 +9,7 @@
 		<Border Grid.Column="0" Background="#252526" BorderBrush="#3E3E42" BorderThickness="0,0,1,0">
 			<ListBox x:Name="CartridgeList" Background="Transparent" SelectionChanged="CartridgeList_SelectionChanged">
 				<ListBox.ItemTemplate>
-					<DataTemplate>
+					<DataTemplate x:DataType="dto:CampaignManifest">
 						<StackPanel Margin="5">
 							<TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" Foreground="White"/>
 							<TextBlock Text="{Binding Version}" Foreground="Gray" FontSize="11"/>
