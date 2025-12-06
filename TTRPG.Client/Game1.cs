@@ -6,14 +6,13 @@ using TTRPG.Client.Services;
 using System.IO;
 using TTRPG.Client.Systems;
 using TTRPG.Client.Services; // Ensure this is there
-private TiledMapRenderer? _mapRenderer;
 
 namespace TTRPG.Client
 {
     public class Game1 : Game
     {
         private GraphicsDeviceManager _graphics;
-
+        private TiledMapRenderer? _mapRenderer;
         // NULLABLE FIX: We add '?' because these are created in Initialize(), not the Constructor.
         private SpriteBatch? _spriteBatch;
         private RenderTarget2D? _renderTarget;

@@ -11,7 +11,7 @@ namespace TTRPG.Client.Services
     public class TiledMapRenderer
     {
         private TiledMap _map;
-        private Dictionary<int, TiledTileset> _tilesets;
+        private Dictionary<int, LoadedTileset> _tilesets; // Use our custom wrapper
         private TextureManager _textureManager;
         private GraphicsDevice _graphicsDevice;
 
@@ -22,39 +22,38 @@ namespace TTRPG.Client.Services
         {
             _graphicsDevice = graphicsDevice;
             _textureManager = textureManager;
-            _tilesets = new Dictionary<int, TiledTileset>();
+            _tilesets = new Dictionary<int, LoadedTileset>();
         }
 
         public void LoadMap(string path)
         {
-            // 1. Load the Map Data
-            // TiledCS parses the XML for us
-            string mapDirectory = Path.GetDirectoryName(path);
             _map = new TiledMap(path);
-
-            // 2. Load Tilesets
-            // The map references tilesets (e.g., "ground.tsx" or embedded images)
-            // We need to load the data AND ensure the textures are loaded.
             _tilesets.Clear();
+
+            // TiledCS v3 uses PascalCase for properties
             foreach (var mapTileset in _map.Tilesets)
             {
                 if (mapTileset.Source != null)
                 {
-                    // External TSX file (not supported in this simple demo yet)
-                    // You would load new TiledTileset(path) here
+                    // External TSX not supported in this demo yet
+                    continue;
                 }
-                else
+
+                // Internal (Embedded) Tileset
+                // We extract the data we need into our custom struct
+                var loadedData = new LoadedTileset
                 {
-                    // Embedded tileset (Simple way)
-                    // We map the "FirstGid" to the Tileset data
-                    _tilesets[mapTileset.FirstGid] = mapTileset;
+                    FirstGid = mapTileset.FirstGid,
+                    TileWidth = mapTileset.TileWidth,
+                    TileHeight = mapTileset.TileHeight,
+                    Columns = mapTileset.Columns,
+                    TileCount = mapTileset.TileCount,
+                    // The image property might be null if not an image tileset, 
+                    // but for our test map it exists.
+                    ImageSource = mapTileset.Image.Source
+                };
 
-                    // Logic: The image path in TMX is usually relative (e.g. "..\Assets\ground.png")
-                    // We just want the filename "ground" to ask TextureManager for it.
-                    string filename = Path.GetFileNameWithoutExtension(mapTileset.Image.Source);
-
-                    // Ensure TextureManager has it (It auto-loads from Assets folder, so we are good)
-                }
+                _tilesets[mapTileset.FirstGid] = loadedData;
             }
         }
 
@@ -62,10 +61,9 @@ namespace TTRPG.Client.Services
         {
             if (_map == null) return;
 
-            // 3. Iterate Layers
             foreach (var layer in _map.Layers)
             {
-                if (layer.type == TiledLayerType.TileLayer)
+                if (layer.Type == TiledLayerType.TileLayer)
                 {
                     DrawTileLayer(spriteBatch, layer);
                 }
@@ -74,27 +72,21 @@ namespace TTRPG.Client.Services
 
         private void DrawTileLayer(SpriteBatch spriteBatch, TiledLayer layer)
         {
-            // Tiled data is a 1D array. We loop X/Y based on map width.
             for (int y = 0; y < _map.Height; y++)
             {
                 for (int x = 0; x < _map.Width; x++)
                 {
-                    // Calculate index in the 1D array
                     int index = (y * _map.Width) + x;
-                    int gid = layer.data[index]; // Global Tile ID
+                    int gid = layer.Data[index]; // 'Data' is PascalCase in v3
 
-                    // GID 0 = Empty tile
                     if (gid == 0) continue;
 
-                    // 4. Resolve GID to Texture
-                    // We need to find which tileset this GID belongs to
                     var tileset = GetTilesetForGid(gid);
                     if (tileset == null) continue;
 
                     // Math to find the specific rectangle in the tileset image
-                    // Normalize GID (remove the FirstGid offset)
-                    int localId = gid - tileset.FirstGid;
-                    int columns = tileset.Columns;
+                    int localId = gid - tileset.Value.FirstGid;
+                    int columns = tileset.Value.Columns;
 
                     int tileX = localId % columns;
                     int tileY = localId / columns;
@@ -106,11 +98,9 @@ namespace TTRPG.Client.Services
                         _map.TileHeight
                     );
 
-                    // Destination on screen
                     var destPos = new Vector2(x * _map.TileWidth, y * _map.TileHeight);
 
-                    // Get Texture
-                    string textureName = Path.GetFileNameWithoutExtension(tileset.Image.Source);
+                    string textureName = Path.GetFileNameWithoutExtension(tileset.Value.ImageSource);
                     var texture = _textureManager.GetTexture(textureName);
 
                     if (texture != null)
@@ -121,11 +111,9 @@ namespace TTRPG.Client.Services
             }
         }
 
-        private TiledTileset GetTilesetForGid(int gid)
+        private LoadedTileset? GetTilesetForGid(int gid)
         {
-            // Find the tileset with the highest FirstGid that is <= our GID
-            // e.g. Gid 5. Tileset A starts at 1. Tileset B starts at 100. It must be A.
-            TiledTileset bestMatch = null;
+            LoadedTileset? bestMatch = null;
             int maxFirstGid = -1;
 
             foreach (var kvp in _tilesets)
@@ -137,6 +125,17 @@ namespace TTRPG.Client.Services
                 }
             }
             return bestMatch;
+        }
+
+        // Custom internal wrapper to avoid modifying TiledCS classes
+        private struct LoadedTileset
+        {
+            public int FirstGid;
+            public int TileWidth;
+            public int TileHeight;
+            public int Columns;
+            public int TileCount;
+            public string ImageSource;
         }
     }
 }
