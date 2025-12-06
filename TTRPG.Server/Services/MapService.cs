@@ -89,14 +89,14 @@ namespace TTRPG.Server.Services
 
         public bool IsWalkable(int x, int y)
         {
-            // 1. Check Bounds
+            // FIX: If no map is loaded, allow movement everywhere (Open Void)
+            if (_collisionGrid == null) return true;
+
+            // 1. Check Bounds (Only if map is loaded)
             if (x < 0 || x >= Width || y < 0 || y >= Height)
-                return false; // Cannot walk out of bounds
+                return false;
 
             // 2. Check Collision Grid
-            if (_collisionGrid == null) return true; // Safe default
-
-            // If Grid[x,y] is true (Wall), return false (Not Walkable)
             return !_collisionGrid[x, y];
         }
     }
