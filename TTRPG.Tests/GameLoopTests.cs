@@ -4,7 +4,7 @@ using Arch.Core.Extensions;
 using TTRPG.Server.Services;
 using TTRPG.Shared.Components;
 using TTRPG.Shared.Enums;
-using TTRPG.Shared.DTOs;
+using System;
 
 namespace TTRPG.Tests
 {
@@ -15,7 +15,10 @@ namespace TTRPG.Tests
         {
             // Arrange
             var world = World.Create();
-            var network = new ServerNetworkService(); // We use the real service, just don't .Start() it
+            var network = new ServerNetworkService();
+            network.Start(0); // FIX: Start network to initialize internals
+            network.SetWorld(world);
+
             var notifications = new NotificationService(network, world);
             var gameLoop = new GameLoopService(network, world, notifications);
 
@@ -25,16 +28,18 @@ namespace TTRPG.Tests
                 new Zone { Id = "Zone_A" }
             );
 
-            // Act: Simulate a network packet arriving
-            // We manually invoke the event that ServerNetworkService fires
+            // Act
             network.OnPlayerInput?.Invoke(entity, MoveDirection.Right);
 
             // Assert
             var newPos = world.Get<Position>(entity);
-            Assert.Equal(1, newPos.X); // 0 + 1 = 1
+            Console.WriteLine($"[Test] Pos X: {newPos.X}"); // Debug Print
+
+            Assert.Equal(1, newPos.X);
             Assert.Equal(0, newPos.Y);
 
             // Cleanup
+            network.Stop();
             World.Destroy(world);
         }
 
@@ -44,6 +49,9 @@ namespace TTRPG.Tests
             // Arrange
             var world = World.Create();
             var network = new ServerNetworkService();
+            network.Start(0); // FIX: Start network
+            network.SetWorld(world);
+
             var notifications = new NotificationService(network, world);
             var gameLoop = new GameLoopService(network, world, notifications);
 
@@ -60,10 +68,13 @@ namespace TTRPG.Tests
             var zone = world.Get<Zone>(entity);
             var pos = world.Get<Position>(entity);
 
+            Console.WriteLine($"[Test] Zone: {zone.Id}, Pos X: {pos.X}");
+
             Assert.Equal(0, pos.X);
-            Assert.Equal("Zone_B", zone.Id); // Logic: X >= 0 is Zone_B
+            Assert.Equal("Zone_B", zone.Id);
 
             // Cleanup
+            network.Stop();
             World.Destroy(world);
         }
     }

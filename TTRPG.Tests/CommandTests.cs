@@ -5,6 +5,7 @@ using TTRPG.Server.Services;
 using TTRPG.Shared.Components;
 using LiteNetLib;
 using System.Runtime.CompilerServices;
+using System;
 
 namespace TTRPG.Tests
 {
@@ -13,35 +14,48 @@ namespace TTRPG.Tests
         [Fact]
         public void TeleportCommand_ShouldMoveEntityToNewZone()
         {
-            // Arrange
+            Console.WriteLine("[Test] Starting Teleport Test...");
+
+            // 1. Setup
             var world = World.Create();
             var network = new ServerNetworkService();
-
-            // FIX: We MUST Start the network so the internal Socket is created.
-            // Port 0 tells the OS to assign any free port.
+            // Start network to prevent NullRef on socket
             network.Start(0);
+            // Important: Link the world to the network so BroadcastToZone doesn't crash
+            network.SetWorld(world);
 
             var service = new NotificationService(network, world);
 
-            // Create a dummy peer key
+            // Mock Peer
             var peer = (NetPeer)RuntimeHelpers.GetUninitializedObject(typeof(NetPeer));
 
+            // Create Entity
             var entity = world.Create(
                 new Position { X = 10, Y = 10 },
                 new Zone { Id = "Zone_A" }
             );
 
-            // Register the session
+            // Verify Initial State
+            var initialZone = world.Get<Zone>(entity);
+            Console.WriteLine($"[Test] Initial Zone: '{initialZone.Id}'");
+            Assert.Equal("Zone_A", initialZone.Id);
+
+            // Register
             network.RegisterPlayerEntity(peer, entity);
 
-            // Act
-            // Send a chat command as if it came from this peer
+            // 2. Act
+            Console.WriteLine("[Test] Sending Command: /tp Zone_Hidden");
             service.SendChatMessage(peer, "/tp Zone_Hidden");
 
-            // Assert
+            // 3. Verify
             var newZone = world.Get<Zone>(entity);
             var newPos = world.Get<Position>(entity);
 
+            Console.WriteLine($"[Test] Post-Command Zone ID: '{newZone.Id}'");
+            Console.WriteLine($"[Test] Post-Command Pos X: {newPos.X}");
+
+            // Assertions
+            Assert.NotNull(newZone.Id);
             Assert.Equal("Zone_Hidden", newZone.Id);
             Assert.Equal(0, newPos.X);
             Assert.Equal(0, newPos.Y);
