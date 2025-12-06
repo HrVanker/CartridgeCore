@@ -56,6 +56,8 @@ namespace TTRPG.Client.Services
 
         private void DrawLayer(SpriteBatch spriteBatch, TiledLayer layer)
         {
+            if (_map == null) return;
+
             var tileData = layer.Data.Tiles;
 
             for (int y = 0; y < _map.Height; y++)
