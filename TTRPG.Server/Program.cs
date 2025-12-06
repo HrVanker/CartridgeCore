@@ -20,6 +20,10 @@ namespace TTRPG.Server
             var loader = new BlueprintLoader();
             string manifestPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "manifest.yaml");
             var manifest = loader.LoadManifest(manifestPath);
+            var mapService = new MapService();
+            // Load the test map for now (In Phase 3, this will be dynamic based on the Zone)
+            string mapPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "test_map.tmx");
+            mapService.LoadMap(mapPath);
 
             Console.WriteLine($"[Cartridge] Loading '{manifest.Name}' (v{manifest.Version}) by {manifest.Author}");
 
@@ -89,7 +93,7 @@ namespace TTRPG.Server
 
             // 8. HOOK UP SPAWNING LOGIC
             // When a peer connects, create a Goblin for them!
-            var gameLoop = new GameLoopService(serverService, world, notificationService);
+            var gameLoop = new GameLoopService(serverService, world, notificationService, mapService);
             serverService.OnPlayerConnected += (peer) =>
             {
                 Console.WriteLine($"[Server] Spawning Player for Peer {peer.Id}...");

@@ -20,7 +20,7 @@ namespace TTRPG.Tests
             network.SetWorld(world);
 
             var notifications = new NotificationService(network, world);
-            var gameLoop = new GameLoopService(network, world, notifications);
+            var gameLoop = new GameLoopService(network, world, notifications, mapService);
 
             // Create a player at (0,0) in Zone_A
             var entity = world.Create(
@@ -53,7 +53,7 @@ namespace TTRPG.Tests
             network.SetWorld(world);
 
             var notifications = new NotificationService(network, world);
-            var gameLoop = new GameLoopService(network, world, notifications);
+            var gameLoop = new GameLoopService(network, world, notifications, mapService);
 
             // Start player at the edge (-1, 0) in Zone_A
             var entity = world.Create(
