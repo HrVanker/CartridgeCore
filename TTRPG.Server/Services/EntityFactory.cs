@@ -83,7 +83,11 @@ namespace TTRPG.Server.Services
                     // Use 'world' to check/remove/add components
                     if (world.Has(entity, compType))
                     {
-                        world.Remove(entity, compType);
+                        world.Set(entity, newComponentData);
+                    }
+                    else
+                    {
+                        world.Add(entity, newComponentData);
                     }
 
                     // Add the new component

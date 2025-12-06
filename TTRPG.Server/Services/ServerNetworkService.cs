@@ -13,7 +13,7 @@ namespace TTRPG.Server.Services
     // We keep INetEventListener because that is what you successfully implemented
     public class ServerNetworkService : INetEventListener
     {
-        private readonly Dictionary<NetPeer, Entity> _playerSessions = new Dictionary<NetPeer, Entity>();
+        private readonly Dictionary<int, (NetPeer Peer, Entity Entity)> _playerSessions = new Dictionary<int, (NetPeer, Entity)>();
         private readonly NetManager _netManager;
         private readonly NetPacketProcessor _packetProcessor; // <--- NEW: Handles data logic
 
@@ -113,9 +113,9 @@ namespace TTRPG.Server.Services
         {
             Console.WriteLine($"[Network] Player disconnected: {disconnectInfo.Reason}");
             // Cleanup Session
-            if (_playerSessions.ContainsKey(peer))
+            if (_playerSessions.ContainsKey(peer.Id))
             {
-                _playerSessions.Remove(peer);
+                _playerSessions.Remove(peer.Id);
             }
             OnPlayerDisconnected?.Invoke(peer, disconnectInfo);
         }
@@ -141,20 +141,19 @@ namespace TTRPG.Server.Services
 
         public void RegisterPlayerEntity(NetPeer peer, Entity entity)
         {
-            _playerSessions[peer] = entity;
+            _playerSessions[peer.Id] = (peer, entity);
         }
 
         public Entity GetEntityForPeer(NetPeer peer)
         {
-            return _playerSessions.TryGetValue(peer, out var entity) ? entity : Entity.Null;
+            return _playerSessions.TryGetValue(peer.Id, out var session) ? session.Entity : Entity.Null;
         }
         private void OnMoveReceived(PlayerMovePacket packet, NetPeer peer)
         {
             //1. Validate Session
-            if (_playerSessions.TryGetValue(peer, out var entity))
+            if (_playerSessions.TryGetValue(peer.Id, out var session))
             {
-                // 2. Forward to Game Logic
-                OnPlayerInput?.Invoke(entity, packet.Direction);
+                OnPlayerInput?.Invoke(session.Entity, packet.Direction);
             }
         }
         private Arch.Core.World _world;
@@ -171,18 +170,16 @@ namespace TTRPG.Server.Services
             NetDataWriter writer = new NetDataWriter();
             _packetProcessor.Write(writer, packet);
 
-            // Iterate over all connected players
-            foreach (var session in _playerSessions)
+            // FIX: Iterate values of the dictionary
+            foreach (var session in _playerSessions.Values)
             {
-                NetPeer peer = session.Key;
-                Arch.Core.Entity entity = session.Value;
+                NetPeer peer = session.Peer;
+                Arch.Core.Entity entity = session.Entity;
 
-                // CHECK: Does this player have a Zone component?
                 if (_world.Has<Zone>(entity))
                 {
                     var playerZone = _world.Get<Zone>(entity);
 
-                    // FILTER: Only send if they are in the target zone
                     if (playerZone.Id == targetZoneId)
                     {
                         peer.Send(writer, method);
