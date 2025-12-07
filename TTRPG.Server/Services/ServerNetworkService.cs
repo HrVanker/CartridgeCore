@@ -80,6 +80,10 @@ namespace TTRPG.Server.Services
         {
             _netManager.PollEvents();
         }
+        public void SetRuleset(IRuleset ruleset)
+        {
+            _ruleset = ruleset;
+        }
 
         // --- NEW: The Logic that handles the specific packet ---
         private void OnJoinReceived(JoinRequestPacket packet, NetPeer peer)
