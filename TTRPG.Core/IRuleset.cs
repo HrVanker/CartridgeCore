@@ -14,4 +14,5 @@ public interface IRuleset
     void Register(object world);
 
     ICombatResolver GetResolver();
+    IUIProvider GetUI();
 }

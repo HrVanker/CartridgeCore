@@ -11,14 +11,17 @@ namespace TTRPG.Rules.Pathfinder
 
         public void Register(object world)
         {
-            // This is where we will eventually register Systems (Phase 2.2)
             Console.WriteLine($"[Rules] {Name} v{Version} initialized!");
         }
 
-        // This links the Interface (Core) to your Logic (Resolver)
         public ICombatResolver GetResolver()
         {
             return new PathfinderResolver();
+        }
+
+        public IUIProvider GetUI()
+        {
+            return new PathfinderUI();
         }
     }
 }
