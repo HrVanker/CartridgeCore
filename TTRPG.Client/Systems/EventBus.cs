@@ -33,5 +33,12 @@ namespace TTRPG.Client.Systems
         {
             OnEntityInspected?.Invoke(id, details);
         }
+        //Chat Events
+        public static event Action<string, string>? OnChatReceived;
+
+        public static void PublishChatReceived(string sender, string message)
+        {
+            OnChatReceived?.Invoke(sender, message);
+        }
     }
 }

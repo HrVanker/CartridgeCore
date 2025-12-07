@@ -6,6 +6,8 @@ namespace TTRPG.Client
 {
     public static class Program
     {
+
+        [STAThread] // Good practice for Windows UI apps
         static void Main()
         {
             using (var game = new Game1())

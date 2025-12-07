@@ -126,11 +126,10 @@ namespace TTRPG.Client.Services
         }
         private void OnChatReceived(ChatMessagePacket packet)
         {
-            // For now, just print to the Debug Output (Output Window in VS)
-            System.Diagnostics.Debug.WriteLine($"[CHAT] {packet.Sender}: {packet.Message}");
+            // OLD: System.Diagnostics.Debug.WriteLine(...);
 
-            // Optional: Route to EventBus if you want to display it on screen later
-            // EventBus.PublishChatMessage(packet.Sender, packet.Message);
+            // NEW: Tell the UI a message arrived
+            EventBus.PublishChatReceived(packet.Sender, packet.Message);
         }
         public void SendChat(string text)
         {

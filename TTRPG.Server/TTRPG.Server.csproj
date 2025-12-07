@@ -28,7 +28,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="Data\test_map.tmx">
-	  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	</None>
   </ItemGroup>
 
