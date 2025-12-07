@@ -49,6 +49,9 @@ namespace TTRPG.Shared
     public class EntityDetailsPacket
     {
         public int EntityId { get; set; }
-        public string Details { get; set; } = string.Empty; // e.g., "Goblin\nHP: 30/30"
+
+        // OLD: public string Details { get; set; }
+        // NEW: Structured Data
+        public Dictionary<string, string> Stats { get; set; } = new Dictionary<string, string>();
     }
 }

@@ -147,8 +147,16 @@ namespace TTRPG.Client.Services
         }
         private void OnDetailsReceived(EntityDetailsPacket packet)
         {
-            // Route to EventBus so the UI can draw it
-            TTRPG.Client.Systems.EventBus.PublishEntityInspected(packet.EntityId, packet.Details);
+            // Convert Dictionary -> String for the current UI
+            // In Phase 3.3, we will pass the Dictionary directly.
+            var sb = new System.Text.StringBuilder();
+
+            foreach (var kvp in packet.Stats)
+            {
+                sb.AppendLine($"{kvp.Key}: {kvp.Value}");
+            }
+
+            EventBus.PublishEntityInspected(packet.EntityId, sb.ToString().TrimEnd());
         }
     }
 }

@@ -1,10 +1,11 @@
 ﻿using System;
+using System.Diagnostics; // Required for Stopwatch
 using System.IO;
 using System.Threading;
 using Arch.Core; // <--- The ECS Core
 using TTRPG.Server.Services;
 using TTRPG.Shared.Components;
-using System.Diagnostics; // Required for Stopwatch
+using TTRPG.Core;
 
 namespace TTRPG.Server
 {
@@ -24,6 +25,20 @@ namespace TTRPG.Server
             // Load the test map for now (In Phase 3, this will be dynamic based on the Zone)
             string mapPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "test_map.tmx");
             mapService.LoadMap(mapPath);
+            var pluginLoader = new PluginLoader();
+            string rulesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TTRPG.Rules.Pathfinder.dll");
+
+            IRuleset activeRuleset = null;
+            if (File.Exists(rulesPath))
+            {
+                activeRuleset = pluginLoader.LoadRuleset(rulesPath);
+                activeRuleset.Register(world); // Initialize it
+                Console.WriteLine($"[Program] Active Rules: {activeRuleset.Name}");
+            }
+            else
+            {
+                Console.WriteLine("[Program] WARNING: Pathfinder DLL not found.");
+            }
 
             Console.WriteLine($"[Cartridge] Loading '{manifest.Name}' (v{manifest.Version}) by {manifest.Author}");
 
@@ -83,6 +98,7 @@ namespace TTRPG.Server
             // 6. Start Networking
             var serverService = new ServerNetworkService();
             serverService.SetWorld(world);
+            if (activeRuleset != null) serverService.SetRuleset(activeRuleset);
             serverService.Start(9050);
 
             Console.WriteLine("Press ESC to stop...");

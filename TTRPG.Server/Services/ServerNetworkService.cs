@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 using Arch.Core;
 using LiteNetLib;
@@ -7,6 +8,7 @@ using TTRPG.Shared; // Required for JoinRequestPacket
 using TTRPG.Shared.Enums;
 using TTRPG.Shared.Components;
 using Arch.Core.Extensions;
+using TTRPG.Core;
 
 namespace TTRPG.Server.Services
 {
@@ -25,6 +27,7 @@ namespace TTRPG.Server.Services
         public Action<Entity, MoveDirection>? OnPlayerInput;
 
         public Action<NetPeer, ChatMessagePacket>? OnChatMessage;
+        private IRuleset? _ruleset;
 
         public ServerNetworkService()
         {
@@ -197,66 +200,51 @@ namespace TTRPG.Server.Services
         {
             if (_world == null) return;
 
-            // FIX: We cannot 'new Entity(id)'.
-            // Instead, we scan the world to find the entity that matches this ID.
-
+            // 1. Find the Entity
             Arch.Core.Entity foundEntity = Arch.Core.Entity.Null;
-
-            // Query ALL entities (Empty description matches everything)
             var query = new Arch.Core.QueryDescription();
-
             _world.Query(in query, (Arch.Core.Entity e) =>
             {
-                // If we found the match, capture it
-                if (e.Id == packet.EntityId)
-                {
-                    foundEntity = e;
-                }
+                if (e.Id == packet.EntityId) foundEntity = e;
             });
 
-            // If foundEntity is not Null, we found it!
             if (foundEntity != Arch.Core.Entity.Null && _world.IsAlive(foundEntity))
             {
-                string info = $"ID: {foundEntity.Id}";
+                // 2. Identify the Viewer (The Player asking)
+                Entity viewer = GetEntityForPeer(peer);
 
-                // 1. Get Health
-                if (_world.Has<TTRPG.Shared.Components.Health>(foundEntity))
+                // 3. Ask the Ruleset for Data (The Logic Phase)
+                Dictionary<string, string> data;
+
+                if (_ruleset != null)
                 {
-                    var hp = _world.Get<TTRPG.Shared.Components.Health>(foundEntity);
-                    info += $"\nHP: {hp.Current}/{hp.Max}";
+                    // Use the Interface logic we just wrote!
+                    data = _ruleset.GetUI().GetInspectionDetails(_world, viewer, foundEntity);
+                }
+                else
+                {
+                    // Fallback if no rules loaded
+                    data = new Dictionary<string, string> { { "Error", "No Ruleset Loaded" } };
                 }
 
-                // 2. Get Stats
-                if (_world.Has<TTRPG.Shared.Components.Stats>(foundEntity))
-                {
-                    var stats = _world.Get<TTRPG.Shared.Components.Stats>(foundEntity);
-                    info += $"\nSTR: {stats.Strength} AGI: {stats.Agility}";
-                }
-
-                // 3. Get Zone
-                if (_world.Has<TTRPG.Shared.Components.Zone>(foundEntity))
-                {
-                    var zone = _world.Get<TTRPG.Shared.Components.Zone>(foundEntity);
-                    info += $"\nZone: {zone.Id}";
-                }
-
-                // 4. Send Reply
+                // 4. Send Response
                 var response = new EntityDetailsPacket
                 {
                     EntityId = packet.EntityId,
-                    Details = info
+                    Stats = data
                 };
 
-                NetDataWriter writer = new NetDataWriter();
-                _packetProcessor.Write(writer, response);
-                peer.Send(writer, DeliveryMethod.ReliableOrdered);
+                BroadcastPacket(response, peer); // Helper to write/send
+                Console.WriteLine($"[Inspector] Sent {data.Count} stats for Entity {foundEntity.Id}");
+            }
+        }
 
-                Console.WriteLine($"[Inspector] Sent details for Entity {foundEntity.Id} to Peer {peer.Id}");
-            }
-            else
-            {
-                Console.WriteLine($"[Inspector] Entity {packet.EntityId} not found or dead.");
-            }
+        // Helper to handle the write/send boilerplate
+        private void BroadcastPacket<T>(T packet, NetPeer target) where T : class, new()
+        {
+            NetDataWriter writer = new NetDataWriter();
+            _packetProcessor.Write(writer, packet);
+            target.Send(writer, DeliveryMethod.ReliableOrdered);
         }
     }
 }
