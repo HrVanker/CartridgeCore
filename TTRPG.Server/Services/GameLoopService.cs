@@ -65,6 +65,12 @@ namespace TTRPG.Server.Services
                 BroadcastPositionToZone(entity.Id, pos, zone.Id);
             });
         }
+        public static string GetZoneIdForPosition(int x, int y)
+        {
+            // Simple split for our test map
+            if (x >= 25) return "Zone_B";
+            return "Zone_A";
+        }
 
         private void HandlePlayerMove(Entity entity, MoveDirection direction)
         {

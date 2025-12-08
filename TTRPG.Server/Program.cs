@@ -89,9 +89,9 @@ namespace TTRPG.Server
                 // --- NEW: Spawn a Test Potion ---
                 // We manually add Position/Zone because items on the ground need to physically exist
                 var potion = factory.Create("potion_healing", world);
-                world.Add(potion, new Position { X = 3, Y = 3 });
-                world.Add(potion, new Zone { Id = "Zone_A" });
-                Console.WriteLine("[Server] Spawend Test Potion at (3,3)");
+                var potionPos = new Position { X = 3, Y = 3 };
+                world.Add(potion, new Zone { Id = GameLoopService.GetZoneIdForPosition(potionPos.X, potionPos.Y) });
+                Console.WriteLine("[Server] Spawnd Test Potion at (3,3)");
 
                 // --- VERIFICATION START ---
                 // We ask the World: "Give me the Stats and Health for this specific goblin entity"
@@ -136,7 +136,18 @@ namespace TTRPG.Server
                 var playerEntity = factory.Create("goblin_grunt", world);
 
                 // ADD ZONE COMPONENT
-                world.Add(playerEntity, new Zone { Id = "Zone_A" }); // Start in Zone A
+                if (world.Has<Position>(playerEntity))
+                {
+                    var pos = world.Get<Position>(playerEntity);
+                    var zoneId = GameLoopService.GetZoneIdForPosition(pos.X, pos.Y);
+                    world.Add(playerEntity, new Zone { Id = zoneId });
+                }
+                else
+                {
+                    // Fallback if YAML has no position
+                    world.Add(playerEntity, new Position { X = 0, Y = 0 });
+                    world.Add(playerEntity, new Zone { Id = "Zone_A" });
+                }
 
                 serverService.RegisterPlayerEntity(peer, playerEntity);
             };
