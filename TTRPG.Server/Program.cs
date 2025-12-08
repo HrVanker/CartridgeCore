@@ -63,11 +63,8 @@ namespace TTRPG.Server
             if (File.Exists(itemPath))
             {
                 var itemBlueprints = loader.LoadBlueprints(itemPath);
-                // Merge items into the main blueprint dictionary
-                foreach (var kvp in itemBlueprints)
-                {
-                    blueprints[kvp.Key] = kvp.Value;
-                }
+                blueprints.AddRange(itemBlueprints);
+
                 Console.WriteLine($"[Loader] Loaded {itemBlueprints.Count} items from items.yaml.");
             }
             else
