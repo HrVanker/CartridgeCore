@@ -113,13 +113,13 @@ namespace TTRPG.Server.Services
                 pos.Y = targetY;
 
                 // 5. Zone Change Logic
-                string newZoneId = (pos.X >= 0) ? "Zone_B" : "Zone_A";
+                string newZoneId = GetZoneIdForPosition(pos.X, pos.Y);
 
                 if (currentZone.Id != newZoneId)
                 {
                     Console.WriteLine($"[GameLoop] Entity {entity.Id} crossed from {currentZone.Id} to {newZoneId}");
-                    _world.Set(entity, new Zone { Id = newZoneId });
                     BroadcastStateToZone(newZoneId);
+                    _world.Set(entity, new Zone { Id = newZoneId });
                 }
 
                 BroadcastPositionToZone(entity.Id, pos, newZoneId);

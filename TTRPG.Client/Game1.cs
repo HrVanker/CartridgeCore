@@ -217,9 +217,11 @@ namespace TTRPG.Client
 
             foreach (var kvp in _entities)
             {
-                // Use specific sprite, or fallback to 'goblin' if texture missing
-                var tex = _textureManager?.GetTexture(kvp.Value.SpriteId)
-                       ?? _textureManager?.GetTexture("goblin");
+                // 1. Try to get the specific sprite (e.g. "potion")
+                var tex = _textureManager?.GetTexture(kvp.Value.SpriteId);
+
+                // 2. Fallback to "goblin" if missing/null
+                if (tex == null) tex = _textureManager?.GetTexture("goblin");
 
                 if (tex != null)
                 {
