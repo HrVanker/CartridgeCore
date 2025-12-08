@@ -58,6 +58,22 @@ namespace TTRPG.Server
                     Console.WriteLine("    [WARNING] Missing Dependency!");
                 }
             }
+            // Load Items
+            string itemPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "items.yaml");
+            if (File.Exists(itemPath))
+            {
+                var itemBlueprints = loader.LoadBlueprints(itemPath);
+                // Merge items into the main blueprint dictionary
+                foreach (var kvp in itemBlueprints)
+                {
+                    blueprints[kvp.Key] = kvp.Value;
+                }
+                Console.WriteLine($"[Loader] Loaded {itemBlueprints.Count} items from items.yaml.");
+            }
+            else
+            {
+                Console.WriteLine("[Loader] Warning: items.yaml not found.");
+            }
 
             // 3. Initialize the Factory (The "Builder")
             // We pass the blueprints so the factory knows how to build a "goblin_grunt"
@@ -73,7 +89,13 @@ namespace TTRPG.Server
 
                 // Apply the "Elite" Template (Decorator Pattern)
                 factory.ApplyTemplate(goblin, "template_elite", world);
-                
+                // --- NEW: Spawn a Test Potion ---
+                // We manually add Position/Zone because items on the ground need to physically exist
+                var potion = factory.Create("potion_healing", world);
+                world.Add(potion, new Position { X = 3, Y = 3 });
+                world.Add(potion, new Zone { Id = "Zone_A" });
+                Console.WriteLine("[Server] Spawend Test Potion at (3,3)");
+
                 // --- VERIFICATION START ---
                 // We ask the World: "Give me the Stats and Health for this specific goblin entity"
                 // Note: Ensure TTRPG.Shared.Components is using'd at the top

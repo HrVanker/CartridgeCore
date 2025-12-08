@@ -41,6 +41,9 @@
     DerivedStats:
       armorClass: 14
       speed: 6
+    Inventory:
+      capacity: 10
+      items: []
 
 - id: "template_elite"
   name: "Elite Modifier"

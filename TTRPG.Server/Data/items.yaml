@@ -1,0 +1,26 @@
+- id: "potion_healing"
+  name: "Health Potion"
+  components:
+    Item:
+      id: "potion_healing"
+      name: "Health Potion"
+      description: "A red bubbly liquid."
+      value: 50
+      weight: 0.5
+      icon: "potion"
+      isStackable: true
+    # Items on the ground need a position, but the Factory handles that.
+    # We define default display info here.
+
+- id: "sword_rusty"
+  name: "Rusty Sword"
+  components:
+    Item:
+      id: "sword_rusty"
+      name: "Rusty Sword"
+      description: "Better than nothing."
+      value: 15
+      weight: 3.0
+      icon: "sword"
+      isStackable: false
+    # Weapons will eventually have a "Weapon" component for combat stats

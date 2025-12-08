@@ -131,12 +131,22 @@ namespace TTRPG.Server.Services
                     object val = data[key];
                     try
                     {
-                        object convertedVal = Convert.ChangeType(val, field.FieldType);
-                        field.SetValue(instance, convertedVal);
+                        // NEW: Handle Lists (YAML often deserializes as List<object>)
+                        if (val is List<object> listObj && field.FieldType == typeof(List<string>))
+                        {
+                            var listStr = listObj.Select(x => x.ToString()).ToList();
+                            field.SetValue(instance, listStr);
+                        }
+                        else
+                        {
+                            // Standard Value Types
+                            object convertedVal = Convert.ChangeType(val, field.FieldType);
+                            field.SetValue(instance, convertedVal);
+                        }
                     }
                     catch
                     {
-                        Console.WriteLine($"    - Failed to set field {field.Name}");
+                        Console.WriteLine($"    - Failed to set field {field.Name} on {type.Name}");
                     }
                 }
             }
