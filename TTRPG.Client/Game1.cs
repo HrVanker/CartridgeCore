@@ -176,6 +176,12 @@ namespace TTRPG.Client
                 if (_currentGameTime - kvp.Value.LastUpdate > 1.0) toRemove.Add(kvp.Key);
             }
             foreach (var id in toRemove) _entities.Remove(id);
+            // Inside Update loop
+            if (_inputManager.IsKeyPressed(Keys.E))
+            {
+                System.Diagnostics.Debug.WriteLine("[Input] E Pressed - Sending Pickup Request");
+                _networkService.SendAction(Shared.Enums.ActionType.Pickup);
+            }
 
             _networkService?.Poll();
             base.Update(gameTime);
