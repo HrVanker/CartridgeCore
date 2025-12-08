@@ -1,5 +1,6 @@
-﻿using TTRPG.Shared.Enums;
-using TTRPG.Shared.Components; // For Position struct
+﻿using TTRPG.Shared.Components; // For Position struct
+using TTRPG.Shared.Enums;
+using TTRPG.Core.DTOs;
 
 namespace TTRPG.Shared
 {
@@ -53,5 +54,15 @@ namespace TTRPG.Shared
         // OLD: public string Details { get; set; }
         // NEW: Structured Data
         public Dictionary<string, string> Stats { get; set; } = new Dictionary<string, string>();
+    }
+    // Client -> Server: "Open my character sheet"
+    public class RequestSheetPacket
+    {
+    }
+
+    // Server -> Client: "Here is your data"
+    public class SheetDataPacket
+    {
+        public CharacterSheetData Sheet { get; set; } = new CharacterSheetData();
     }
 }

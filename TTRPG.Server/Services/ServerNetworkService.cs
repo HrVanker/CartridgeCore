@@ -9,6 +9,7 @@ using TTRPG.Shared.Enums;
 using TTRPG.Shared.Components;
 using Arch.Core.Extensions;
 using TTRPG.Core; // Required for IRuleset
+using Newtonsoft.Json;
 
 namespace TTRPG.Server.Services
 {
@@ -63,6 +64,20 @@ namespace TTRPG.Server.Services
                     return dict;
                 }
             );
+            // Register CharacterSheetData via JSON
+            _packetProcessor.RegisterNestedType<TTRPG.Core.DTOs.CharacterSheetData>(
+                (writer, sheet) =>
+                {
+                    string json = JsonConvert.SerializeObject(sheet);
+                    writer.Put(json);
+                },
+                (reader) =>
+                {
+                    string json = reader.GetString();
+                    return JsonConvert.DeserializeObject<TTRPG.Core.DTOs.CharacterSheetData>(json);
+                }
+            );
+            _packetProcessor.SubscribeReusable<RequestSheetPacket, NetPeer>(OnSheetRequested);
 
             _packetProcessor.SubscribeReusable<JoinRequestPacket, NetPeer>(OnJoinReceived);
             _packetProcessor.SubscribeReusable<InspectEntityPacket, NetPeer>(OnInspectReceived);
@@ -152,6 +167,23 @@ namespace TTRPG.Server.Services
             {
                 if (_world.Has<Zone>(session.Entity) && _world.Get<Zone>(session.Entity).Id == targetZoneId) session.Peer.Send(writer, method);
             }
+        }
+        private void OnSheetRequested(RequestSheetPacket packet, NetPeer peer)
+        {
+            if (_world == null || _ruleset == null) return;
+
+            // 1. Who is asking?
+            var entity = GetEntityForPeer(peer);
+            if (entity == Arch.Core.Entity.Null) return;
+
+            Console.WriteLine($"[Server] Generating Sheet for Entity {entity.Id}...");
+
+            // 2. Generate Data via Ruleset
+            var sheetData = _ruleset.GetUI().GetCharacterSheet(_world, entity);
+
+            // 3. Send Back
+            var response = new SheetDataPacket { Sheet = sheetData };
+            BroadcastPacket(response, peer);
         }
         public void OnNetworkError(IPEndPoint e, System.Net.Sockets.SocketError s) { }
         public void OnNetworkReceiveUnconnected(IPEndPoint e, NetPacketReader r, UnconnectedMessageType m) { }

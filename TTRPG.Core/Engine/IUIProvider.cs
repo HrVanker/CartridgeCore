@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Arch.Core;
+using TTRPG.Core.DTOs;
 
 namespace TTRPG.Core.Engine
 {
@@ -10,5 +11,7 @@ namespace TTRPG.Core.Engine
         /// Returns a dictionary of labels and values (e.g. "Health" -> "50/100").
         /// </summary>
         Dictionary<string, string> GetInspectionDetails(World world, Entity viewer, Entity target);
+
+        CharacterSheetData GetCharacterSheet(World world, Entity entity);
     }
 }

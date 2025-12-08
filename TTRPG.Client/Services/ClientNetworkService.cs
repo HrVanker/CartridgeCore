@@ -5,6 +5,7 @@ using LiteNetLib.Utils;
 using TTRPG.Client.Systems;
 using TTRPG.Shared;
 using TTRPG.Shared.Enums;
+using Newtonsoft.Json;
 
 namespace TTRPG.Client.Services
 {
@@ -51,6 +52,21 @@ namespace TTRPG.Client.Services
                     return dict;
                 }
             );
+            _packetProcessor.RegisterNestedType<TTRPG.Core.DTOs.CharacterSheetData>(
+                (writer, sheet) =>
+                {
+                    string json = JsonConvert.SerializeObject(sheet);
+                    writer.Put(json);
+                },
+                (reader) =>
+                {
+                    string json = reader.GetString();
+                    return JsonConvert.DeserializeObject<TTRPG.Core.DTOs.CharacterSheetData>(json);
+                }
+            );
+
+            // Subscribe
+            _packetProcessor.SubscribeReusable<SheetDataPacket>(OnSheetReceived);
 
             // 3. Subscriptions
             _packetProcessor.SubscribeReusable<JoinResponsePacket>(OnJoinResponse);
@@ -166,6 +182,18 @@ namespace TTRPG.Client.Services
                 sb.AppendLine($"{kvp.Key}: {kvp.Value}");
             }
             EventBus.PublishEntityInspected(packet.EntityId, sb.ToString().TrimEnd());
+        }
+        private void OnSheetReceived(SheetDataPacket packet)
+        {
+            EventBus.PublishSheetReceived(packet.Sheet);
+        }
+
+        public void RequestCharacterSheet()
+        {
+            var packet = new RequestSheetPacket();
+            NetDataWriter writer = new NetDataWriter();
+            _packetProcessor.Write(writer, packet);
+            _client.FirstPeer?.Send(writer, DeliveryMethod.ReliableOrdered);
         }
     }
 }

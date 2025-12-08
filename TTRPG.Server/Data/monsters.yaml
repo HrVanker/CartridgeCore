@@ -7,9 +7,20 @@
     Health: 
       current: 30
       max: 30
-    Stats:
+    # OLD: Stats (Strength, Agility)
+    # NEW: Attributes (Full D&D Suite)
+    Attributes:
       strength: 8
-      agility: 12
+      dexterity: 12
+      constitution: 10
+      intelligence: 8
+      wisdom: 8
+      charisma: 6
+    # NEW: DerivedStats (For AC/Speed)
+    DerivedStats:
+      armorClass: 12
+      speed: 6
+      initiative: 1
 
 - id: "orc_warrior"
   name: "Orc Warrior"
@@ -20,13 +31,24 @@
     Health: 
       current: 80
       max: 80
+    Attributes:
+      strength: 16
+      dexterity: 10
+      constitution: 14
+      intelligence: 8
+      wisdom: 10
+      charisma: 8
+    DerivedStats:
+      armorClass: 14
+      speed: 6
 
 - id: "template_elite"
   name: "Elite Modifier"
   components:
-    Stats:
+    Attributes:
       strength: 18
-      agility: 15
+      dexterity: 14
+      constitution: 16
     Health:
       current: 50
       max: 50

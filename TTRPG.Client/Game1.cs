@@ -74,13 +74,6 @@ namespace TTRPG.Client
                 _entities[id] = new EntityRenderData { Position = screenPos, LastUpdate = _currentGameTime };
             };
 
-            // Temporary listener until Step 6
-            EventBus.OnEntityInspected += (id, details) =>
-            {
-                _currentTooltip = details;
-                _tooltipTimer = 3.0;
-            };
-
             _networkService = new ClientNetworkService();
             _networkService.Connect("localhost", 9050);
 
@@ -114,7 +107,7 @@ namespace TTRPG.Client
         protected override void Update(GameTime gameTime)
         {
             _inputManager.Update();
-            _uiManager?.Update(); // Allow UI to sync focus state
+            _uiManager?.Update(gameTime); // Allow UI to sync focus state
 
             // Escape Handling via UI Manager
             if (_inputManager.IsKeyPressedRaw(Keys.Escape))
@@ -153,13 +146,6 @@ namespace TTRPG.Client
             {
                 var target = _entities.Values.First().Position;
                 _camera.Position = Vector2.Lerp(_camera.Position, target, 0.1f);
-            }
-
-            // Tooltip Timer (Legacy)
-            if (_tooltipTimer > 0)
-            {
-                _tooltipTimer -= gameTime.ElapsedGameTime.TotalSeconds;
-                if (_tooltipTimer <= 0) _currentTooltip = string.Empty;
             }
 
             var toRemove = new System.Collections.Generic.List<int>();
@@ -215,14 +201,6 @@ namespace TTRPG.Client
                 {
                     _spriteBatch.Draw(goblinTex, kvp.Value.Position, Color.White);
                 }
-            }
-            _spriteBatch.End();
-
-            _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            // Draw Legacy Tooltip
-            if (!string.IsNullOrEmpty(_currentTooltip))
-            {
-                _spriteBatch.Draw(_whitePixel, new Rectangle((int)_tooltipPosition.X, (int)_tooltipPosition.Y, 120, 60), Color.Black * 0.8f);
             }
             _spriteBatch.End();
 

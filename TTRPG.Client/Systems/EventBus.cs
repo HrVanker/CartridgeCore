@@ -1,6 +1,7 @@
 ﻿using System;
-using TTRPG.Shared.Enums;
+using TTRPG.Core.DTOs;
 using TTRPG.Shared.Components;
+using TTRPG.Shared.Enums;
 
 namespace TTRPG.Client.Systems
 {
@@ -39,6 +40,12 @@ namespace TTRPG.Client.Systems
         public static void PublishChatReceived(string sender, string message)
         {
             OnChatReceived?.Invoke(sender, message);
+        }
+        public static event Action<CharacterSheetData>? OnSheetReceived;
+
+        public static void PublishSheetReceived(CharacterSheetData sheet)
+        {
+            OnSheetReceived?.Invoke(sheet);
         }
     }
 }
