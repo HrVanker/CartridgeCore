@@ -150,6 +150,7 @@ namespace TTRPG.Client
                 }
                 if (_inputManager.IsKeyPressed(Keys.E))
                 {
+                    System.Diagnostics.Debug.WriteLine("[Input] Pressed E (Pickup)");
                     _networkService.SendAction(Shared.Enums.ActionType.Pickup);
                 }
                 var mState = _inputManager.GetMouseState();

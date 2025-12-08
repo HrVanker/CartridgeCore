@@ -183,6 +183,7 @@ namespace TTRPG.Server.Services
             var inventory = _world.Get<Inventory>(player);
 
             // 1. Find items at player's feet
+            // Note: We use a query to scan for ANY entity with 'Item' + 'Position' at this location
             Entity itemEntity = Entity.Null;
             string itemName = "";
             string itemId = "";
@@ -190,7 +191,7 @@ namespace TTRPG.Server.Services
             var query = new QueryDescription().WithAll<Position, Item>();
             _world.Query(in query, (Entity e, ref Position pos, ref Item item) =>
             {
-                // Must be at same location AND not be the player themselves
+                // Must be at exact same X,Y and NOT be the player
                 if (pos.X == playerPos.X && pos.Y == playerPos.Y && e.Id != player.Id)
                 {
                     itemEntity = e;
@@ -202,26 +203,32 @@ namespace TTRPG.Server.Services
             // 2. Process Pickup
             if (itemEntity != Entity.Null)
             {
-                // Logic: Add to inventory list
+                Console.WriteLine($"[GameLoop] Pickup: {itemName} ({itemId})");
+
+                // Initialize list if null (safety)
                 if (inventory.Items == null) inventory.Items = new System.Collections.Generic.List<string>();
 
                 if (inventory.Items.Count < inventory.Capacity)
                 {
+                    // Add to inventory
                     inventory.Items.Add(itemId);
-                    Console.WriteLine($"[GameLoop] Player picked up {itemName} ({itemId})");
 
-                    // Destroy the world entity (it's in the bag now)
+                    // IMPORTANT: Destroy the world entity so it vanishes from the map
                     _world.Destroy(itemEntity);
 
-                    // Notify Player
+                    // Send Confirmation
                     var chat = new ChatMessagePacket { Sender = "System", Message = $"You picked up {itemName}." };
-                    _network.BroadcastPacket(chat); // Ideally send only to player, but broadcast works for Alpha
+                    _network.BroadcastPacket(chat);
                 }
                 else
                 {
                     var chat = new ChatMessagePacket { Sender = "System", Message = "Inventory full!" };
                     _network.BroadcastPacket(chat);
                 }
+            }
+            else
+            {
+                Console.WriteLine($"[GameLoop] No item found at {playerPos.X},{playerPos.Y}");
             }
         }
     }
