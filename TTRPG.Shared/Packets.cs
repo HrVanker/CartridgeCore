@@ -34,6 +34,7 @@ namespace TTRPG.Shared
     {
         public int EntityId { get; set; } // Arch Entity ID
         public Position Position { get; set; }
+        public string SpriteId { get; set; } = string.Empty;
     }
     public class ChatMessagePacket
     {
@@ -64,5 +65,9 @@ namespace TTRPG.Shared
     public class SheetDataPacket
     {
         public CharacterSheetData Sheet { get; set; } = new CharacterSheetData();
+    }
+    public class PlayerActionPacket
+    {
+        public ActionType Action { get; set; }
     }
 }

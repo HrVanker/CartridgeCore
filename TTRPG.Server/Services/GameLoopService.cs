@@ -36,6 +36,7 @@ namespace TTRPG.Server.Services
             _network.OnPlayerInput += HandlePlayerMove;
             _notifications = notifications;
             _mapService = mapService;
+            _network.OnPlayerAction += HandlePlayerAction;
         }
 
         // Helper to safely get state (Default to Exploration)
@@ -159,6 +160,63 @@ namespace TTRPG.Server.Services
         {
             var packet = new EntityPositionPacket { EntityId = entityId, Position = pos };
             _network.BroadcastToZone(zoneId, packet);
+        }
+        private void HandlePlayerAction(Entity player, ActionType action)
+        {
+            if (action == ActionType.Pickup)
+            {
+                HandlePickup(player);
+            }
+        }
+
+        private void HandlePickup(Entity player)
+        {
+            if (!_world.Has<Position>(player) || !_world.Has<Inventory>(player)) return;
+
+            var playerPos = _world.Get<Position>(player);
+            var inventory = _world.Get<Inventory>(player);
+
+            // 1. Find items at player's feet
+            Entity itemEntity = Entity.Null;
+            string itemName = "";
+            string itemId = "";
+
+            var query = new QueryDescription().WithAll<Position, Item>();
+            _world.Query(in query, (Entity e, ref Position pos, ref Item item) =>
+            {
+                // Must be at same location AND not be the player themselves
+                if (pos.X == playerPos.X && pos.Y == playerPos.Y && e.Id != player.Id)
+                {
+                    itemEntity = e;
+                    itemName = item.Name;
+                    itemId = item.Id;
+                }
+            });
+
+            // 2. Process Pickup
+            if (itemEntity != Entity.Null)
+            {
+                // Logic: Add to inventory list
+                if (inventory.Items == null) inventory.Items = new System.Collections.Generic.List<string>();
+
+                if (inventory.Items.Count < inventory.Capacity)
+                {
+                    inventory.Items.Add(itemId);
+                    Console.WriteLine($"[GameLoop] Player picked up {itemName} ({itemId})");
+
+                    // Destroy the world entity (it's in the bag now)
+                    _world.Destroy(itemEntity);
+
+                    // Notify Player
+                    var chat = new ChatMessagePacket { Sender = "System", Message = $"You picked up {itemName}." };
+                    _network.BroadcastPacket(chat); // Ideally send only to player, but broadcast works for Alpha
+                }
+                else
+                {
+                    var chat = new ChatMessagePacket { Sender = "System", Message = "Inventory full!" };
+                    _network.BroadcastPacket(chat);
+                }
+            }
         }
     }
 }

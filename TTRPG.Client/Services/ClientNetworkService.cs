@@ -151,7 +151,7 @@ namespace TTRPG.Client.Services
         }
         private void OnPositionReceived(EntityPositionPacket packet)
         {
-            EventBus.PublishEntityMoved(packet.EntityId, packet.Position);
+            EventBus.PublishEntityMoved(packet.EntityId, packet.Position, packet.SpriteId);
         }
         private void OnChatReceived(ChatMessagePacket packet)
         {
@@ -191,6 +191,13 @@ namespace TTRPG.Client.Services
         public void RequestCharacterSheet()
         {
             var packet = new RequestSheetPacket();
+            NetDataWriter writer = new NetDataWriter();
+            _packetProcessor.Write(writer, packet);
+            _client.FirstPeer?.Send(writer, DeliveryMethod.ReliableOrdered);
+        }
+        public void SendAction(TTRPG.Shared.Enums.ActionType action)
+        {
+            var packet = new PlayerActionPacket { Action = action };
             NetDataWriter writer = new NetDataWriter();
             _packetProcessor.Write(writer, packet);
             _client.FirstPeer?.Send(writer, DeliveryMethod.ReliableOrdered);

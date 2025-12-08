@@ -1,6 +1,8 @@
 - id: "potion_healing"
   name: "Health Potion"
   components:
+    Sprite:
+      texture: "potion"
     Item:
       id: "potion_healing"
       name: "Health Potion"
@@ -15,6 +17,8 @@
 - id: "sword_rusty"
   name: "Rusty Sword"
   components:
+    Sprite:
+      texture: "rusty_sword"
     Item:
       id: "sword_rusty"
       name: "Rusty Sword"

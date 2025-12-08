@@ -23,11 +23,11 @@ namespace TTRPG.Client.Systems
         {
             OnGameStateChanged?.Invoke(newState);
         }
-        public static event Action<int, Position>? OnEntityMoved;
+        public static event Action<int, Position, string>? OnEntityMoved; // Added string spriteId
 
-        public static void PublishEntityMoved(int entityId, Position pos)
+        public static void PublishEntityMoved(int id, Position pos, string spriteId)
         {
-            OnEntityMoved?.Invoke(entityId, pos);
+            OnEntityMoved?.Invoke(id, pos, spriteId);
         }
         public static event Action<int, string>? OnEntityInspected;
         public static void PublishEntityInspected(int id, string details)

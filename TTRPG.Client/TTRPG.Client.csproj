@@ -25,6 +25,12 @@
     <None Update="Assets\ground.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="Assets\potion.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Assets\rusty_sword.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
 	  <None Include="..\TTRPG.Server\Data\test_map.tmx">
 		  <Link>Content\test_map.tmx</Link>
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

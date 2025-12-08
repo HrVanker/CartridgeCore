@@ -68,10 +68,28 @@ namespace TTRPG.Client
             EventBus.OnServerJoined += (msg) => System.Diagnostics.Debug.WriteLine($"[UI] Joined: {msg}");
             EventBus.OnGameStateChanged += (state) => _backgroundColor = (state == Shared.Enums.GameState.Combat) ? Color.DarkRed : Color.CornflowerBlue;
 
-            EventBus.OnEntityMoved += (id, pos) =>
+            EventBus.OnEntityMoved += (id, pos, spriteId) =>
             {
                 var screenPos = new Vector2(pos.X * 16, pos.Y * 16);
-                _entities[id] = new EntityRenderData { Position = screenPos, LastUpdate = _currentGameTime };
+
+                // Update or Create
+                if (_entities.ContainsKey(id))
+                {
+                    var existing = _entities[id];
+                    existing.Position = screenPos;
+                    existing.LastUpdate = _currentGameTime;
+                    existing.SpriteId = spriteId; // Update sprite (e.g. if player changes armor)
+                    _entities[id] = existing;
+                }
+                else
+                {
+                    _entities[id] = new EntityRenderData
+                    {
+                        Position = screenPos,
+                        LastUpdate = _currentGameTime,
+                        SpriteId = spriteId
+                    };
+                }
             };
 
             _networkService = new ClientNetworkService();
@@ -130,7 +148,10 @@ namespace TTRPG.Client
                     else if (_inputManager.IsKeyDown(Keys.Left)) { _networkService.SendMove(Shared.Enums.MoveDirection.Left); _lastMoveTime = _currentGameTime; }
                     else if (_inputManager.IsKeyDown(Keys.Right)) { _networkService.SendMove(Shared.Enums.MoveDirection.Right); _lastMoveTime = _currentGameTime; }
                 }
-
+                if (_inputManager.IsKeyPressed(Keys.E))
+                {
+                    _networkService.SendAction(Shared.Enums.ActionType.Pickup);
+                }
                 var mState = _inputManager.GetMouseState();
                 var prevMState = _inputManager.GetPreviousMouseState();
 
@@ -194,12 +215,15 @@ namespace TTRPG.Client
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: viewMatrix);
             _mapRenderer?.Draw(_spriteBatch, viewMatrix);
 
-            var goblinTex = _textureManager?.GetTexture("goblin");
-            if (goblinTex != null)
+            foreach (var kvp in _entities)
             {
-                foreach (var kvp in _entities)
+                // Use specific sprite, or fallback to 'goblin' if texture missing
+                var tex = _textureManager?.GetTexture(kvp.Value.SpriteId)
+                       ?? _textureManager?.GetTexture("goblin");
+
+                if (tex != null)
                 {
-                    _spriteBatch.Draw(goblinTex, kvp.Value.Position, Color.White);
+                    _spriteBatch.Draw(tex, kvp.Value.Position, Color.White);
                 }
             }
             _spriteBatch.End();
@@ -237,6 +261,7 @@ namespace TTRPG.Client
         {
             public Vector2 Position;
             public double LastUpdate;
+            public string SpriteId;
         }
     }
 }

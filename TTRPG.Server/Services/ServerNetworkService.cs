@@ -26,6 +26,7 @@ namespace TTRPG.Server.Services
         public Action<NetPeer, DisconnectInfo>? OnPlayerDisconnected;
         public Action<Entity, MoveDirection>? OnPlayerInput;
         public Action<NetPeer, ChatMessagePacket>? OnChatMessage;
+        public Action<Entity, ActionType>? OnPlayerAction;
 
         private Arch.Core.World? _world;
         private IRuleset? _ruleset; // NEW Field
@@ -64,6 +65,7 @@ namespace TTRPG.Server.Services
                     return dict;
                 }
             );
+            _packetProcessor.SubscribeReusable<PlayerActionPacket, NetPeer>(OnActionReceived);
             // Register CharacterSheetData via JSON
             _packetProcessor.RegisterNestedType<TTRPG.Core.DTOs.CharacterSheetData>(
                 (writer, sheet) =>
@@ -161,11 +163,39 @@ namespace TTRPG.Server.Services
         public void BroadcastToZone<T>(string targetZoneId, T packet, DeliveryMethod method = DeliveryMethod.ReliableOrdered) where T : class, new()
         {
             if (_world == null) return;
+
+            // SPECIAL LOGIC: Populate SpriteId if this is a Position Packet
+            if (packet is EntityPositionPacket posPacket)
+            {
+                // Look up the entity by ID is hard without an Entity reference.
+                // We should update GameLoopService to pass the Entity, but for now let's query.
+
+                // Simple hack: We iterate all entities to find the one matching ID.
+                // (Phase 5 will optimize this with an EntityMap)
+                var desc = new Arch.Core.QueryDescription().WithAll<Position>();
+                _world.Query(in desc, (Arch.Core.Entity e) =>
+                {
+                    if (e.Id == posPacket.EntityId)
+                    {
+                        if (_world.Has<Sprite>(e))
+                            posPacket.SpriteId = _world.Get<Sprite>(e).Texture;
+                        else if (_world.Has<Item>(e))
+                            posPacket.SpriteId = _world.Get<Item>(e).Icon;
+                        else
+                            posPacket.SpriteId = "goblin";
+                    }
+                });
+            }
+
             NetDataWriter writer = new NetDataWriter();
             _packetProcessor.Write(writer, packet);
+
             foreach (var session in _playerSessions.Values)
             {
-                if (_world.Has<Zone>(session.Entity) && _world.Get<Zone>(session.Entity).Id == targetZoneId) session.Peer.Send(writer, method);
+                if (_world.Has<Zone>(session.Entity) && _world.Get<Zone>(session.Entity).Id == targetZoneId)
+                {
+                    session.Peer.Send(writer, method);
+                }
             }
         }
         private void OnSheetRequested(RequestSheetPacket packet, NetPeer peer)
@@ -184,6 +214,13 @@ namespace TTRPG.Server.Services
             // 3. Send Back
             var response = new SheetDataPacket { Sheet = sheetData };
             BroadcastPacket(response, peer);
+        }
+        private void OnActionReceived(PlayerActionPacket packet, NetPeer peer)
+        {
+            if (_playerSessions.TryGetValue(peer.Id, out var session))
+            {
+                OnPlayerAction?.Invoke(session.Entity, packet.Action);
+            }
         }
         public void OnNetworkError(IPEndPoint e, System.Net.Sockets.SocketError s) { }
         public void OnNetworkReceiveUnconnected(IPEndPoint e, NetPacketReader r, UnconnectedMessageType m) { }

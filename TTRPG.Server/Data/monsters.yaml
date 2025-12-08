@@ -1,6 +1,8 @@
 - id: "goblin_grunt"
   name: "Goblin Grunt"
   components:
+    Sprite:
+      texture: "goblin"
     Position: 
       x: 2
       y: 2
