@@ -5,9 +5,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TTRPG.Server.Abstractions\TTRPG.Server.Abstractions.csproj" />
-    <ProjectReference Include="..\TTRPG.Shared\TTRPG.Shared.csproj" />
-    <ProjectReference Include="..\TTRPG.Core\TTRPG.Core.csproj" />
+	  <ProjectReference Include="..\TTRPG.Server.Abstractions\TTRPG.Server.Abstractions.csproj" />
+	  <ProjectReference Include="..\TTRPG.Shared\TTRPG.Shared.csproj" />
+	  <ProjectReference Include="..\TTRPG.Core\TTRPG.Core.csproj" />
+	  <ProjectReference Include="..\TTRPG.Rules.Sample\TTRPG.Rules.Pathfinder.csproj" />
   </ItemGroup>
 
   <ItemGroup>

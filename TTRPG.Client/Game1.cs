@@ -6,9 +6,7 @@ using Microsoft.Xna.Framework.Input;
 using TTRPG.Client.Services;
 using System.IO;
 using TTRPG.Client.Systems;
-using Myra;
-using Myra.Graphics2D.UI;
-using Myra.Graphics2D;
+using TTRPG.Client.Managers; // <--- NEW Namespace
 
 namespace TTRPG.Client
 {
@@ -21,14 +19,10 @@ namespace TTRPG.Client
 
         // --- SYSTEMS ---
         private InputManager _inputManager;
-        private Desktop? _desktop;
+        private UIManager? _uiManager; // <--- REPLACES Desktop/Widgets
         private TextureManager? _textureManager;
         private TiledMapRenderer? _mapRenderer;
-        private Camera2D? _camera; // <--- RESTORED CAMERA
-
-        // --- UI WIDGETS ---
-        private ListView? _chatList;
-        private TextBox? _chatInput;
+        private Camera2D? _camera;
 
         // --- GAME STATE ---
         private const int VIRTUAL_WIDTH = 640;
@@ -42,6 +36,7 @@ namespace TTRPG.Client
         private double _currentGameTime;
         private double _lastMoveTime;
 
+        // Tooltips (These stay here for 3.3 Step 6, then move to UI)
         private string _currentTooltip = string.Empty;
         private Vector2 _tooltipPosition;
         private double _tooltipTimer;
@@ -67,11 +62,9 @@ namespace TTRPG.Client
             _renderTarget = new RenderTarget2D(GraphicsDevice, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
             UpdateDestinationRectangle();
 
-            // --- RESTORED CAMERA INIT ---
             _camera = new Camera2D(GraphicsDevice, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
             _camera.Position = new Vector2(0, 0);
 
-            // Networking Events
             EventBus.OnServerJoined += (msg) => System.Diagnostics.Debug.WriteLine($"[UI] Joined: {msg}");
             EventBus.OnGameStateChanged += (state) => _backgroundColor = (state == Shared.Enums.GameState.Combat) ? Color.DarkRed : Color.CornflowerBlue;
 
@@ -81,6 +74,7 @@ namespace TTRPG.Client
                 _entities[id] = new EntityRenderData { Position = screenPos, LastUpdate = _currentGameTime };
             };
 
+            // Temporary listener until Step 6
             EventBus.OnEntityInspected += (id, details) =>
             {
                 _currentTooltip = details;
@@ -89,6 +83,9 @@ namespace TTRPG.Client
 
             _networkService = new ClientNetworkService();
             _networkService.Connect("localhost", 9050);
+
+            // --- NEW UI MANAGER ---
+            _uiManager = new UIManager(this, _networkService, _inputManager);
 
             base.Initialize();
         }
@@ -110,71 +107,21 @@ namespace TTRPG.Client
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[Map Error] {ex.Message}"); }
 
-            // --- MYRA SETUP ---
-            MyraEnvironment.Game = this;
-            _desktop = new Desktop();
-
-            var grid = new Grid
-            {
-                RowSpacing = 8,
-                ColumnSpacing = 8,
-                Padding = new Thickness(10),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Bottom
-            };
-
-            grid.RowsProportions.Add(new Proportion(ProportionType.Pixels, 200));
-            grid.RowsProportions.Add(new Proportion(ProportionType.Auto));
-
-            _chatList = new ListView { Width = 300 };
-            Grid.SetRow(_chatList, 0);
-
-            _chatInput = new TextBox { Width = 300, TextColor = Color.White };
-            Grid.SetRow(_chatInput, 1);
-
-            _chatInput.KeyDown += (s, a) =>
-            {
-                if (a.Data == Keys.Enter)
-                {
-                    string text = _chatInput.Text;
-                    if (!string.IsNullOrWhiteSpace(text))
-                    {
-                        _networkService?.SendChat(text);
-                        _chatInput.Text = "";
-                        _desktop.FocusedKeyboardWidget = null; // Release Focus
-                    }
-                }
-            };
-
-            grid.Widgets.Add(_chatList);
-            grid.Widgets.Add(_chatInput);
-            _desktop.Root = grid;
-
-            EventBus.OnChatReceived += (sender, msg) =>
-            {
-                var label = new Label { Text = $"{sender}: {msg}", Wrap = true, TextColor = Color.White };
-                _chatList.Widgets.Add(label);
-                if (_chatList.Widgets.Count > 0) _chatList.SelectedIndex = _chatList.Widgets.Count - 1;
-            };
+            // --- LOAD UI ---
+            _uiManager?.LoadContent();
         }
 
         protected override void Update(GameTime gameTime)
         {
             _inputManager.Update();
+            _uiManager?.Update(); // Allow UI to sync focus state
 
-            // UI Input Capture Logic
-            if (_desktop != null)
-            {
-                _inputManager.IsInputCaptured = (_desktop.FocusedKeyboardWidget != null);
-            }
-
-            // Escape Handling
+            // Escape Handling via UI Manager
             if (_inputManager.IsKeyPressedRaw(Keys.Escape))
             {
-                if (_desktop != null && _desktop.FocusedKeyboardWidget != null)
+                if (_uiManager != null && _uiManager.IsInputCaptured)
                 {
-                    _desktop.FocusedKeyboardWidget = null;
-                    _inputManager.IsInputCaptured = false;
+                    _uiManager.Unfocus();
                 }
                 else Exit();
             }
@@ -183,7 +130,6 @@ namespace TTRPG.Client
 
             if (_networkService != null && !_inputManager.IsInputCaptured)
             {
-                // Movement
                 if (_currentGameTime - _lastMoveTime > 0.15)
                 {
                     if (_inputManager.IsKeyDown(Keys.Up)) { _networkService.SendMove(Shared.Enums.MoveDirection.Up); _lastMoveTime = _currentGameTime; }
@@ -192,28 +138,30 @@ namespace TTRPG.Client
                     else if (_inputManager.IsKeyDown(Keys.Right)) { _networkService.SendMove(Shared.Enums.MoveDirection.Right); _lastMoveTime = _currentGameTime; }
                 }
 
-                // Mouse Logic (Inspect)
                 var mState = _inputManager.GetMouseState();
                 var prevMState = _inputManager.GetPreviousMouseState();
 
                 if (mState.RightButton == ButtonState.Pressed &&
                     prevMState.RightButton == ButtonState.Released &&
-                    !_desktop.IsMouseOverGUI)
+                    !(_uiManager?.IsMouseOverUI() ?? false))
                 {
                     HandleMouseClick(mState);
                 }
             }
 
-            // --- RESTORED CAMERA FOLLOW LOGIC ---
             if (_entities.Count > 0 && _camera != null)
             {
-                // Simple: Follow the first entity we know about (Usually the player if they spawned first)
-                // In Pass 3, we will check entity.IsMine
                 var target = _entities.Values.First().Position;
                 _camera.Position = Vector2.Lerp(_camera.Position, target, 0.1f);
             }
 
-            // Cleanup Ghosts
+            // Tooltip Timer (Legacy)
+            if (_tooltipTimer > 0)
+            {
+                _tooltipTimer -= gameTime.ElapsedGameTime.TotalSeconds;
+                if (_tooltipTimer <= 0) _currentTooltip = string.Empty;
+            }
+
             var toRemove = new System.Collections.Generic.List<int>();
             foreach (var kvp in _entities)
             {
@@ -229,25 +177,20 @@ namespace TTRPG.Client
         {
             if (_camera == null) return;
 
-            // 1. Get Screen Coordinates adjusted for Resolution scaling
             float scaleX = (float)VIRTUAL_WIDTH / _destinationRectangle.Width;
             float scaleY = (float)VIRTUAL_HEIGHT / _destinationRectangle.Height;
             float relativeX = (mState.X - _destinationRectangle.X) * scaleX;
             float relativeY = (mState.Y - _destinationRectangle.Y) * scaleY;
 
-            // 2. Convert to World Coordinates using Camera Matrix
-            // This handles the camera pan/zoom automatically
             Vector2 mouseScreenPos = new Vector2(relativeX, relativeY);
             Vector2 mouseWorldPos = _camera.ScreenToWorld(mouseScreenPos);
 
-            // 3. Hit Test
             foreach (var kvp in _entities)
             {
-                // Entity positions are already in World Space pixels
                 if (Vector2.Distance(mouseWorldPos, kvp.Value.Position) < 20)
                 {
                     _networkService?.InspectEntity(kvp.Key);
-                    _tooltipPosition = mouseScreenPos; // Draw tooltip at screen location
+                    _tooltipPosition = mouseScreenPos;
                     break;
                 }
             }
@@ -260,13 +203,9 @@ namespace TTRPG.Client
             GraphicsDevice.SetRenderTarget(_renderTarget);
             GraphicsDevice.Clear(Color.Black);
 
-            // --- RESTORED CAMERA MATRIX ---
-            // Use the Camera's matrix instead of the static center transform
             var viewMatrix = _camera?.GetViewMatrix() ?? Matrix.Identity;
 
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: viewMatrix);
-
-            // Draw Map & Entities using Camera View
             _mapRenderer?.Draw(_spriteBatch, viewMatrix);
 
             var goblinTex = _textureManager?.GetTexture("goblin");
@@ -279,18 +218,14 @@ namespace TTRPG.Client
             }
             _spriteBatch.End();
 
-            // --- UI PASS (Screen Space) ---
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-
-            // Draw Tooltip (Manually rendered UI)
+            // Draw Legacy Tooltip
             if (!string.IsNullOrEmpty(_currentTooltip))
             {
-                // We draw this in screen space (no camera transform)
                 _spriteBatch.Draw(_whitePixel, new Rectangle((int)_tooltipPosition.X, (int)_tooltipPosition.Y, 120, 60), Color.Black * 0.8f);
             }
             _spriteBatch.End();
 
-            // --- FINAL PASS: Upscale to Monitor ---
             GraphicsDevice.SetRenderTarget(null);
             GraphicsDevice.Clear(Color.Black);
 
@@ -298,18 +233,8 @@ namespace TTRPG.Client
             _spriteBatch.Draw(_renderTarget, _destinationRectangle, Color.White);
             _spriteBatch.End();
 
-            // Myra UI (Always draws on top, automatically handles screen space)
-            _desktop?.Render();
-
-            // --- FIX: RESTORE TOOLTIP TIMER ---
-            if (_tooltipTimer > 0)
-            {
-                _tooltipTimer -= gameTime.ElapsedGameTime.TotalSeconds;
-                if (_tooltipTimer <= 0)
-                {
-                    _currentTooltip = string.Empty;
-                }
-            }
+            // --- DRAW UI MANAGER ---
+            _uiManager?.Draw();
 
             base.Draw(gameTime);
         }

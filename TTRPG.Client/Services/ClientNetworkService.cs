@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic; // Required
 using LiteNetLib;
 using LiteNetLib.Utils;
 using TTRPG.Client.Systems;
@@ -18,45 +19,57 @@ namespace TTRPG.Client.Services
             _listener = new EventBasedNetListener();
             _client = new NetManager(_listener);
             _packetProcessor = new NetPacketProcessor();
-            
+
+            // 1. Register Position (Existing)
             _packetProcessor.RegisterNestedType<TTRPG.Shared.Components.Position>(
-                (writer, pos) =>
+                (writer, pos) => { writer.Put(pos.X); writer.Put(pos.Y); },
+                (reader) => new TTRPG.Shared.Components.Position { X = reader.GetInt(), Y = reader.GetInt() }
+            );
+
+            // 2. Register Dictionary (NEW FIX)
+            // This teaches LiteNetLib how to send the "Stats" list
+            _packetProcessor.RegisterNestedType<Dictionary<string, string>>(
+                (writer, dict) =>
                 {
-                    writer.Put(pos.X);
-                    writer.Put(pos.Y);
+                    writer.Put(dict.Count);
+                    foreach (var kvp in dict)
+                    {
+                        writer.Put(kvp.Key);
+                        writer.Put(kvp.Value);
+                    }
                 },
                 (reader) =>
                 {
-                    return new TTRPG.Shared.Components.Position
+                    int count = reader.GetInt();
+                    var dict = new Dictionary<string, string>();
+                    for (int i = 0; i < count; i++)
                     {
-                        X = reader.GetInt(),
-                        Y = reader.GetInt()
-                    };
+                        var key = reader.GetString();
+                        var val = reader.GetString();
+                        dict[key] = val;
+                    }
+                    return dict;
                 }
             );
 
-            // 1. REGISTER RESPONSE HANDLER
-            // When the Server replies, this method runs
+            // 3. Subscriptions
             _packetProcessor.SubscribeReusable<JoinResponsePacket>(OnJoinResponse);
             _packetProcessor.SubscribeReusable<GameStatePacket>(OnGameStateReceived);
             _packetProcessor.SubscribeReusable<EntityPositionPacket>(OnPositionReceived);
             _packetProcessor.SubscribeReusable<ChatMessagePacket>(OnChatReceived);
             _packetProcessor.SubscribeReusable<EntityDetailsPacket>(OnDetailsReceived);
 
-            // 2. HANDLE CONNECTION SUCCESS
             _listener.PeerConnectedEvent += peer =>
             {
                 Console.WriteLine("[Client] We are connected! Sending Join Request...");
                 SendJoinRequest(peer);
             };
 
-            // 3. HANDLE INCOMING DATA
             _listener.NetworkReceiveEvent += (peer, reader, deliveryMethod, channel) =>
             {
                 _packetProcessor.ReadAllPackets(reader);
             };
 
-            // 4. HANDLE DISCONNECTION
             _listener.PeerDisconnectedEvent += (peer, info) =>
             {
                 Console.WriteLine($"[Client] Disconnected: {info.Reason}");
@@ -147,15 +160,11 @@ namespace TTRPG.Client.Services
         }
         private void OnDetailsReceived(EntityDetailsPacket packet)
         {
-            // Convert Dictionary -> String for the current UI
-            // In Phase 3.3, we will pass the Dictionary directly.
             var sb = new System.Text.StringBuilder();
-
             foreach (var kvp in packet.Stats)
             {
                 sb.AppendLine($"{kvp.Key}: {kvp.Value}");
             }
-
             EventBus.PublishEntityInspected(packet.EntityId, sb.ToString().TrimEnd());
         }
     }
