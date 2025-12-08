@@ -167,22 +167,28 @@ namespace TTRPG.Server.Services
             // SPECIAL LOGIC: Populate SpriteId if this is a Position Packet
             if (packet is EntityPositionPacket posPacket)
             {
-                // Look up the entity by ID is hard without an Entity reference.
-                // We should update GameLoopService to pass the Entity, but for now let's query.
+                // FIX: Iterate ALL entities with Position, then manually check for optional components.
+                // This prevents crashes when an entity has 'Sprite' but misses 'Item'.
+                var query = new Arch.Core.QueryDescription().WithAll<Position>();
 
-                // Simple hack: We iterate all entities to find the one matching ID.
-                // (Phase 5 will optimize this with an EntityMap)
-                var desc = new Arch.Core.QueryDescription().WithAll<Position>();
-                _world.Query(in desc, (Arch.Core.Entity e) =>
+                _world.Query(in query, (Arch.Core.Entity e) =>
                 {
                     if (e.Id == posPacket.EntityId)
                     {
+                        string spriteId = "goblin"; // Default fallback
+
+                        // Check Sprite Component first (Highest priority)
                         if (_world.Has<Sprite>(e))
-                            posPacket.SpriteId = _world.Get<Sprite>(e).Texture;
+                        {
+                            spriteId = _world.Get<Sprite>(e).Texture;
+                        }
+                        // Check Item Component second
                         else if (_world.Has<Item>(e))
-                            posPacket.SpriteId = _world.Get<Item>(e).Icon;
-                        else
-                            posPacket.SpriteId = "goblin";
+                        {
+                            spriteId = _world.Get<Item>(e).Icon;
+                        }
+
+                        posPacket.SpriteId = spriteId;
                     }
                 });
             }
