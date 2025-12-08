@@ -90,8 +90,13 @@ namespace TTRPG.Server
                 // We manually add Position/Zone because items on the ground need to physically exist
                 var potion = factory.Create("potion_healing", world);
                 var potionPos = new Position { X = 3, Y = 3 };
-                world.Add(potion, new Zone { Id = GameLoopService.GetZoneIdForPosition(potionPos.X, potionPos.Y) });
-                Console.WriteLine("[Server] Spawnd Test Potion at (3,3)");
+                var zId = GameLoopService.GetZoneIdForPosition(potionPos.X, potionPos.Y);
+                world.Add(potion, potionPos, new Zone { Id = zId });
+                Console.WriteLine($"[Server] Spawned Test Potion (Entity {potion.Id}) at (3,3) in {zId}");
+
+                // VERIFY COMPONENTS
+                Console.WriteLine($"[Verify] Potion has Position: {world.Has<Position>(potion)}");
+                Console.WriteLine($"[Verify] Potion has Zone: {world.Has<Zone>(potion)}");
 
                 // --- VERIFICATION START ---
                 // We ask the World: "Give me the Stats and Health for this specific goblin entity"

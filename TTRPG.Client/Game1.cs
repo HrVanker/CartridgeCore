@@ -217,10 +217,15 @@ namespace TTRPG.Client
 
             foreach (var kvp in _entities)
             {
-                // 1. Try to get the specific sprite (e.g. "potion")
-                var tex = _textureManager?.GetTexture(kvp.Value.SpriteId);
+                string spriteId = kvp.Value.SpriteId;
 
-                // 2. Fallback to "goblin" if missing/null
+                // DEBUG: Print info for ALL entities occasionally
+                if (gameTime.TotalGameTime.Milliseconds % 2000 < 20) // Every 2 seconds
+                {
+                    System.Diagnostics.Debug.WriteLine($"[Render] Entity {kvp.Key} | SpriteId: '{spriteId}' | Pos: {kvp.Value.Position}");
+                }
+
+                var tex = _textureManager?.GetTexture(spriteId);
                 if (tex == null) tex = _textureManager?.GetTexture("goblin");
 
                 if (tex != null)
