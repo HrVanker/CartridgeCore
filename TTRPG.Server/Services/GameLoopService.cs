@@ -123,6 +123,14 @@ namespace TTRPG.Server.Services
 
         private void HandlePickup(Entity player)
         {
+            bool hasPos = _world.Has<Position>(player);
+            bool hasInv = _world.Has<Inventory>(player);
+
+            if (!hasPos || !hasInv)
+            {
+                Console.WriteLine($"[GameLoop] Pickup Failed: Position={hasPos}, Inventory={hasInv}");
+                return;
+            }
             if (!_world.Has<Position>(player) || !_world.Has<Inventory>(player))
             {
                 Console.WriteLine("[GameLoop] Pickup Failed: Player missing Position or Inventory.");

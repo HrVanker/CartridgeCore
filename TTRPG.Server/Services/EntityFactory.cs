@@ -42,14 +42,45 @@ namespace TTRPG.Server.Services
         {
             if (!_blueprints.ContainsKey(blueprintId))
             {
-                Console.WriteLine($"[Factory] Error: Blueprint '{blueprintId}' not found.");
-                return Entity.Null;
+                throw new ArgumentException($"Blueprint '{blueprintId}' not found.");
             }
 
+            var blueprint = _blueprints[blueprintId];
             var entity = world.Create();
-            Console.WriteLine($"[Factory] Spawning Base: {blueprintId}...");
 
-            ApplyTemplate(entity, blueprintId, world);
+            Console.WriteLine($"[Factory] Building entity '{blueprintId}'...");
+
+            foreach (var componentName in blueprint.Components.Keys)
+            {
+                // 1. Check if Type exists
+                if (!_componentTypes.ContainsKey(componentName))
+                {
+                    Console.WriteLine($"[Factory] ERROR: Component type '{componentName}' not found in TTRPG.Shared!");
+                    continue;
+                }
+
+                var type = _componentTypes[componentName];
+                var componentData = blueprint.Components[componentName];
+
+                try
+                {
+                    // 2. Attempt Creation
+                    var componentInstance = CreateComponentFromData(type, componentData);
+
+                    // 3. Add to World
+                    SetOrAddComponent(world, entity, componentInstance, type);
+
+                    // Debug Log for Inventory specifically
+                    if (componentName == "Inventory")
+                    {
+                        Console.WriteLine($"[Factory] SUCCESS: Added Inventory to {blueprintId}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Factory] CRITICAL: Failed to add {componentName}: {ex.Message}");
+                }
+            }
 
             return entity;
         }
