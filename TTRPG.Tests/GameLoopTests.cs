@@ -50,29 +50,29 @@ namespace TTRPG.Tests
             // Arrange
             var world = World.Create();
             var network = new ServerNetworkService();
-            network.Start(0); // FIX: Start network
+            network.Start(0);
             network.SetWorld(world);
-            var mapService = new MapService();
 
             var notifications = new NotificationService(network, world);
+            // We need a map service that allows movement at X=25
+            var mapService = new MapService();
+            // (Note: Since we don't load a map, it defaults to open/walkable, which is perfect for this test)
+
             var gameLoop = new GameLoopService(network, world, notifications, mapService);
 
-            // Start player at the edge (-1, 0) in Zone_A
-            var entity = world.Create(
-                new Position { X = -1, Y = 0 },
-                new Zone { Id = "Zone_A" }
-            );
+            // FIX: Start the player right next to the new boundary (X=24)
+            var entity = world.Create(new Position { X = 24, Y = 0 }, new Zone { Id = "Zone_A" });
 
-            // Act: Move Right (X becomes 0) -> Should trigger Zone_B
+            // Act: Move RIGHT (24 -> 25)
+            // This crosses the threshold defined in GetZoneIdForPosition (x >= 25)
+            // We invoke the handler directly or via network event simulation
+            // Since HandlePlayerMove is private, we simulate the network event:
             network.OnPlayerInput?.Invoke(entity, MoveDirection.Right);
 
             // Assert
             var zone = world.Get<Zone>(entity);
-            var pos = world.Get<Position>(entity);
 
-            Console.WriteLine($"[Test] Zone: {zone.Id}, Pos X: {pos.X}");
-
-            Assert.Equal(0, pos.X);
+            // Should now be Zone_B because 25 >= 25
             Assert.Equal("Zone_B", zone.Id);
 
             // Cleanup

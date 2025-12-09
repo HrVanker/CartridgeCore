@@ -57,5 +57,44 @@ namespace TTRPG.Tests
             // Cleanup
             World.Destroy(world);
         }
-    }
-}
+    
+    [Fact]
+        public void Create_ShouldInitializeInventoryComponent_Correctly()
+        {
+            // Arrange
+            var world = World.Create();
+
+            // Define a blueprint with an Inventory
+            var blueprint = new TTRPG.Shared.DTOs.EntityBlueprint
+            {
+                Id = "hero",
+                Components = new Dictionary<string, Dictionary<string, object>>
+                {
+                    {
+                        "Inventory", new Dictionary<string, object>
+                        {
+                            { "Capacity", 20 },
+                            // Note: YAML deserializer usually passes List<object> here
+                            { "Items", new List<object> { "starter_sword" } }
+                        }
+                    }
+                }
+            };
+
+            var factory = new EntityFactory(new List<TTRPG.Shared.DTOs.EntityBlueprint> { blueprint });
+
+            // Act
+            var entity = factory.Create("hero", world);
+
+            // Assert
+            Assert.True(world.Has<Inventory>(entity));
+            var inv = world.Get<Inventory>(entity);
+
+            Assert.Equal(20, inv.Capacity);
+            Assert.NotNull(inv.Items);
+            Assert.Single(inv.Items);
+            Assert.Equal("starter_sword", inv.Items[0]);
+
+            World.Destroy(world);
+        }
+    } }
