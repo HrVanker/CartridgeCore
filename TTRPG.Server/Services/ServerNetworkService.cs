@@ -196,11 +196,19 @@ namespace TTRPG.Server.Services
         public void BroadcastToZone<T>(string targetZoneId, T packet, DeliveryMethod method = DeliveryMethod.ReliableOrdered) where T : class, new()
         {
             if (_world == null) return;
+
+            // REMOVED: The logic that searched for "if packet is EntityPositionPacket"
+            // The GameLoopService now handles populating SpriteId.
+
             NetDataWriter writer = new NetDataWriter();
             _packetProcessor.Write(writer, packet);
+
             foreach (var session in _playerSessions.Values)
             {
-                if (_world.Has<Zone>(session.Entity) && _world.Get<Zone>(session.Entity).Id == targetZoneId) session.Peer.Send(writer, method);
+                if (_world.Has<Zone>(session.Entity) && _world.Get<Zone>(session.Entity).Id == targetZoneId)
+                {
+                    session.Peer.Send(writer, method);
+                }
             }
         }
         public void OnNetworkError(IPEndPoint e, System.Net.Sockets.SocketError s) { }

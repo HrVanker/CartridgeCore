@@ -50,14 +50,21 @@ namespace TTRPG.Client.Services
             }
         }
 
-        public Texture2D? GetTexture(string id)
+        public Texture2D? GetTexture(string name)
         {
-            if (_textures.TryGetValue(id.ToLower(), out var texture))
+            if (_textures.TryGetValue(name, out var texture))
             {
                 return texture;
             }
-            // Return a purple square (Error Texture) if missing? 
-            // For now, return null to keep it simple.
+
+            // DEBUG: Log failures to help diagnose the "Goblin Fallback" issue
+            // We filter out "goblin" itself to avoid infinite spam if goblin is missing.
+            if (name != "goblin")
+            {
+                System.Diagnostics.Debug.WriteLine($"[TextureManager] WARNING: Requested '{name}' but it was not found!");
+                System.Diagnostics.Debug.WriteLine($"[TextureManager] Available keys: {string.Join(", ", _textures.Keys)}");
+            }
+
             return null;
         }
     }

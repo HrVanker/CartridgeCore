@@ -64,7 +64,8 @@ namespace TTRPG.Server.Services
         {
             _world.Query(in _entitiesQuery, (Entity entity, ref Position pos, ref Zone zone) =>
             {
-                BroadcastPositionToZone(entity.Id, pos, zone.Id);
+                // FIX: Pass the whole Entity, not just ID
+                BroadcastPositionToZone(entity, pos, zone.Id);
             });
         }
 
@@ -106,7 +107,7 @@ namespace TTRPG.Server.Services
                     BroadcastStateToZone(newZoneId);
                 }
 
-                BroadcastPositionToZone(entity.Id, pos, newZoneId);
+                BroadcastPositionToZone(entity, pos, newZoneId);
                 IncrementSteps(newZoneId);
             }
         }
@@ -211,10 +212,33 @@ namespace TTRPG.Server.Services
             var packet = new GameStatePacket { NewState = GetZoneState(zoneId) };
             _network.BroadcastToZone(zoneId, packet);
         }
-        private void BroadcastPositionToZone(int entityId, Position pos, string zoneId)
+        private void BroadcastPositionToZone(Entity entity, Position pos, string zoneId)
         {
-            // Use the "Smart" broadcast logic that finds sprites
-            var packet = new EntityPositionPacket { EntityId = entityId, Position = pos };
+            var packet = new EntityPositionPacket
+            {
+                EntityId = entity.Id,
+                Position = pos,
+                SpriteId = "goblin" // Default
+            };
+
+            // 1. Check Sprite Component
+            if (_world.Has<Sprite>(entity))
+            {
+                packet.SpriteId = _world.Get<Sprite>(entity).Texture;
+            }
+            // 2. Check Item Component
+            else if (_world.Has<Item>(entity))
+            {
+                packet.SpriteId = _world.Get<Item>(entity).Icon;
+            }
+
+            // Debug log if empty (Safety check)
+            if (string.IsNullOrEmpty(packet.SpriteId))
+            {
+                Console.WriteLine($"[GameLoop] Warning: Entity {entity.Id} has empty SpriteId!");
+                packet.SpriteId = "goblin";
+            }
+
             _network.BroadcastToZone(zoneId, packet);
         }
     }
