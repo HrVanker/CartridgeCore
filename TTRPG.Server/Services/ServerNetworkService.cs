@@ -2,15 +2,13 @@
 using System.Collections.Generic;
 using System.Net;
 using Arch.Core;
-using Arch.Core.Extensions;
 using LiteNetLib;
 using LiteNetLib.Utils;
-using Newtonsoft.Json;
-using TTRPG.Core; // Required for IRuleset
 using TTRPG.Shared;
-using TTRPG.Shared.Components;
-using TTRPG.Shared.DTOs;
 using TTRPG.Shared.Enums;
+using TTRPG.Shared.Components;
+using Arch.Core.Extensions;
+using TTRPG.Core;
 
 namespace TTRPG.Server.Services
 {
@@ -27,70 +25,59 @@ namespace TTRPG.Server.Services
         public Action<NetPeer, DisconnectInfo>? OnPlayerDisconnected;
         public Action<Entity, MoveDirection>? OnPlayerInput;
         public Action<NetPeer, ChatMessagePacket>? OnChatMessage;
-        public Action<Entity, ActionType>? OnPlayerAction;
-        private EntityFactory? _factory;
+        public Action<Entity, ActionType>? OnPlayerAction; // Required for Pickup
 
         private Arch.Core.World? _world;
-        private IRuleset? _ruleset; // NEW Field
+        private IRuleset? _ruleset;
+        private EntityFactory? _factory;
 
         public ServerNetworkService()
         {
-            _packetProcessor.RegisterNestedType<TTRPG.Shared.DTOs.InventoryData>(
-            (writer, data) => { writer.Put(Newtonsoft.Json.JsonConvert.SerializeObject(data)); },
-            (reader) => { return Newtonsoft.Json.JsonConvert.DeserializeObject<TTRPG.Shared.DTOs.InventoryData>(reader.GetString()); }
-            );
-            _packetProcessor.SubscribeReusable<RequestInventoryPacket, NetPeer>(OnRequestInventory);
+            // --- FIX: THIS LINE WAS MISSING ---
             _packetProcessor = new NetPacketProcessor();
+            // ----------------------------------
 
-            // 1. Register Position
+            // 1. Register Nested Types
             _packetProcessor.RegisterNestedType<TTRPG.Shared.Components.Position>(
                 (writer, pos) => { writer.Put(pos.X); writer.Put(pos.Y); },
                 (reader) => new TTRPG.Shared.Components.Position { X = reader.GetInt(), Y = reader.GetInt() }
             );
 
-            // 2. Register Dictionary (NEW)
+            // Register Dictionary (For Inspector)
             _packetProcessor.RegisterNestedType<Dictionary<string, string>>(
                 (writer, dict) =>
                 {
                     writer.Put(dict.Count);
-                    foreach (var kvp in dict)
-                    {
-                        writer.Put(kvp.Key);
-                        writer.Put(kvp.Value);
-                    }
+                    foreach (var kvp in dict) { writer.Put(kvp.Key); writer.Put(kvp.Value); }
                 },
                 (reader) =>
                 {
                     int count = reader.GetInt();
                     var dict = new Dictionary<string, string>();
-                    for (int i = 0; i < count; i++)
-                    {
-                        var key = reader.GetString();
-                        var val = reader.GetString();
-                        dict[key] = val;
-                    }
+                    for (int i = 0; i < count; i++) dict[reader.GetString()] = reader.GetString();
                     return dict;
                 }
             );
-            _packetProcessor.SubscribeReusable<PlayerActionPacket, NetPeer>(OnActionReceived);
-            // Register CharacterSheetData via JSON
-            _packetProcessor.RegisterNestedType<TTRPG.Core.DTOs.CharacterSheetData>(
-                (writer, sheet) =>
-                {
-                    string json = JsonConvert.SerializeObject(sheet);
-                    writer.Put(json);
-                },
-                (reader) =>
-                {
-                    string json = reader.GetString();
-                    return JsonConvert.DeserializeObject<TTRPG.Core.DTOs.CharacterSheetData>(json);
-                }
-            );
-            _packetProcessor.SubscribeReusable<RequestSheetPacket, NetPeer>(OnSheetRequested);
 
+            // Register InventoryData (For Phase 4.4) using JSON
+            _packetProcessor.RegisterNestedType<TTRPG.Shared.DTOs.InventoryData>(
+                (writer, data) => { writer.Put(Newtonsoft.Json.JsonConvert.SerializeObject(data)); },
+                (reader) => { return Newtonsoft.Json.JsonConvert.DeserializeObject<TTRPG.Shared.DTOs.InventoryData>(reader.GetString()); }
+            );
+
+            // Register CharacterSheetData (For Phase 3.4) using JSON
+            _packetProcessor.RegisterNestedType<TTRPG.Core.DTOs.CharacterSheetData>(
+                (writer, sheet) => { writer.Put(Newtonsoft.Json.JsonConvert.SerializeObject(sheet)); },
+                (reader) => { return Newtonsoft.Json.JsonConvert.DeserializeObject<TTRPG.Core.DTOs.CharacterSheetData>(reader.GetString()); }
+            );
+
+            // 2. Subscribe to Packets
             _packetProcessor.SubscribeReusable<JoinRequestPacket, NetPeer>(OnJoinReceived);
             _packetProcessor.SubscribeReusable<InspectEntityPacket, NetPeer>(OnInspectReceived);
             _packetProcessor.SubscribeReusable<PlayerMovePacket, NetPeer>(OnMoveReceived);
+            _packetProcessor.SubscribeReusable<PlayerActionPacket, NetPeer>(OnActionReceived); // Required for Pickup
+            _packetProcessor.SubscribeReusable<RequestInventoryPacket, NetPeer>(OnRequestInventory); // Required for Inventory Window
+            _packetProcessor.SubscribeReusable<RequestSheetPacket, NetPeer>(OnSheetRequested);
             _packetProcessor.SubscribeReusable<ChatMessagePacket, NetPeer>((packet, peer) => OnChatMessage?.Invoke(peer, packet));
 
             _netManager = new NetManager(this);
@@ -99,26 +86,31 @@ namespace TTRPG.Server.Services
         public void Start(int port) { _netManager.Start(port); Console.WriteLine($"[Network] Server listening on port {port}..."); }
         public void Stop() => _netManager.Stop();
         public void Poll() => _netManager.PollEvents();
-        public void SetWorld(Arch.Core.World world) => _world = world;
 
-        // --- NEW METHOD ---
-        public void SetRuleset(IRuleset ruleset)
-        {
-            _ruleset = ruleset;
-        }
+        public void SetWorld(Arch.Core.World world) => _world = world;
+        public void SetRuleset(IRuleset ruleset) => _ruleset = ruleset;
+        public void SetFactory(EntityFactory factory) => _factory = factory;
+
+        // --- HANDLERS ---
 
         private void OnJoinReceived(JoinRequestPacket packet, NetPeer peer)
         {
-            Console.WriteLine($"[Server] Join Request from {packet.Username} (v{packet.Version})");
+            Console.WriteLine($"[Server] Join Request from {packet.Username}");
             var response = new JoinResponsePacket { Success = true, Message = $"Welcome {packet.Username}!" };
             BroadcastPacket(response, peer);
         }
 
-        // --- UPDATED LOGIC ---
+        private void OnActionReceived(PlayerActionPacket packet, NetPeer peer)
+        {
+            if (_playerSessions.TryGetValue(peer.Id, out var session))
+            {
+                OnPlayerAction?.Invoke(session.Entity, packet.Action);
+            }
+        }
+
         private void OnInspectReceived(InspectEntityPacket packet, NetPeer peer)
         {
             if (_world == null) return;
-
             Arch.Core.Entity foundEntity = Arch.Core.Entity.Null;
             var query = new Arch.Core.QueryDescription();
             _world.Query(in query, (Arch.Core.Entity e) => { if (e.Id == packet.EntityId) foundEntity = e; });
@@ -127,16 +119,8 @@ namespace TTRPG.Server.Services
             {
                 Entity viewer = GetEntityForPeer(peer);
                 Dictionary<string, string> data;
-
-                if (_ruleset != null)
-                {
-                    // Use the Ruleset logic!
-                    data = _ruleset.GetUI().GetInspectionDetails(_world, viewer, foundEntity);
-                }
-                else
-                {
-                    data = new Dictionary<string, string> { { "Error", "No Ruleset Loaded" } };
-                }
+                if (_ruleset != null) data = _ruleset.GetUI().GetInspectionDetails(_world, viewer, foundEntity);
+                else data = new Dictionary<string, string> { { "Error", "No Ruleset Loaded" } };
 
                 var response = new EntityDetailsPacket { EntityId = packet.EntityId, Stats = data };
                 BroadcastPacket(response, peer);
@@ -144,24 +128,66 @@ namespace TTRPG.Server.Services
             }
         }
 
+        private void OnRequestInventory(RequestInventoryPacket packet, NetPeer peer)
+        {
+            if (_world == null || _factory == null) return;
+            var player = GetEntityForPeer(peer);
+            if (player == Arch.Core.Entity.Null) return;
+
+            if (_world.Has<Inventory>(player))
+            {
+                var invComponent = _world.Get<Inventory>(player);
+                var data = new TTRPG.Shared.DTOs.InventoryData { Capacity = invComponent.Capacity };
+
+                if (invComponent.Items != null)
+                {
+                    foreach (var itemId in invComponent.Items)
+                    {
+                        var bp = _factory.GetBlueprint(itemId);
+                        if (bp != null)
+                        {
+                            string name = bp.Name;
+                            string icon = "goblin";
+                            string desc = "";
+                            if (bp.Components.TryGetValue("Item", out var itemRaw) && itemRaw is Dictionary<string, object> itemData)
+                            {
+                                if (itemData.ContainsKey("name")) name = itemData["name"].ToString();
+                                if (itemData.ContainsKey("icon")) icon = itemData["icon"].ToString();
+                                if (itemData.ContainsKey("description")) desc = itemData["description"].ToString();
+                            }
+                            data.Items.Add(new TTRPG.Shared.DTOs.ItemDisplay { Id = itemId, Name = name, Icon = icon, Description = desc, Count = 1 });
+                        }
+                    }
+                }
+                var response = new InventoryPacket { Data = data };
+                BroadcastPacket(response, peer);
+                Console.WriteLine($"[Inventory] Sent {data.Items.Count} items to peer {peer.Id}");
+            }
+        }
+
+        private void OnSheetRequested(RequestSheetPacket packet, NetPeer peer)
+        {
+            if (_world == null || _ruleset == null) return;
+            var entity = GetEntityForPeer(peer);
+            if (entity == Arch.Core.Entity.Null) return;
+
+            Console.WriteLine($"[Server] Generating Sheet for Entity {entity.Id}...");
+            var sheetData = _ruleset.GetUI().GetCharacterSheet(_world, entity);
+            var response = new SheetDataPacket { Sheet = sheetData };
+            BroadcastPacket(response, peer);
+        }
+
+        // --- NETWORK HELPERS ---
         public void OnConnectionRequest(ConnectionRequest request) => request.AcceptIfKey("TTRPG_KEY");
         public void OnPeerConnected(NetPeer peer) { Console.WriteLine($"[Network] Connected: {peer}"); OnPlayerConnected?.Invoke(peer); }
-        public void OnPeerDisconnected(NetPeer peer, DisconnectInfo info)
-        {
-            if (_playerSessions.ContainsKey(peer.Id)) _playerSessions.Remove(peer.Id);
-            OnPlayerDisconnected?.Invoke(peer, info);
-        }
+        public void OnPeerDisconnected(NetPeer peer, DisconnectInfo info) { if (_playerSessions.ContainsKey(peer.Id)) _playerSessions.Remove(peer.Id); OnPlayerDisconnected?.Invoke(peer, info); }
         private void BroadcastPacket<T>(T packet, NetPeer target) where T : class, new()
         {
-            NetDataWriter writer = new NetDataWriter();
-            _packetProcessor.Write(writer, packet);
-            target.Send(writer, DeliveryMethod.ReliableOrdered);
+            NetDataWriter writer = new NetDataWriter(); _packetProcessor.Write(writer, packet); target.Send(writer, DeliveryMethod.ReliableOrdered);
         }
         public void BroadcastPacket<T>(T packet, DeliveryMethod method = DeliveryMethod.ReliableOrdered) where T : class, new()
         {
-            NetDataWriter writer = new NetDataWriter();
-            _packetProcessor.Write(writer, packet);
-            _netManager.SendToAll(writer, method);
+            NetDataWriter writer = new NetDataWriter(); _packetProcessor.Write(writer, packet); _netManager.SendToAll(writer, method);
         }
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod method) => _packetProcessor.ReadAllPackets(reader, peer);
         public void RegisterPlayerEntity(NetPeer peer, Entity entity) => _playerSessions[peer.Id] = (peer, entity);
@@ -170,124 +196,13 @@ namespace TTRPG.Server.Services
         public void BroadcastToZone<T>(string targetZoneId, T packet, DeliveryMethod method = DeliveryMethod.ReliableOrdered) where T : class, new()
         {
             if (_world == null) return;
-
-            // SPECIAL LOGIC: Populate SpriteId if this is a Position Packet
-            if (packet is EntityPositionPacket posPacket)
-            {
-                // FIX: Iterate ALL entities with Position, then manually check for optional components.
-                // This prevents crashes when an entity has 'Sprite' but misses 'Item'.
-                var query = new Arch.Core.QueryDescription().WithAll<Position>();
-
-                _world.Query(in query, (Arch.Core.Entity e) =>
-                {
-                    if (e.Id == posPacket.EntityId)
-                    {
-                        string spriteId = "goblin"; // Default fallback
-
-                        // Check Sprite Component first (Highest priority)
-                        if (_world.Has<Sprite>(e))
-                        {
-                            spriteId = _world.Get<Sprite>(e).Texture;
-                        }
-                        // Check Item Component second
-                        else if (_world.Has<Item>(e))
-                        {
-                            spriteId = _world.Get<Item>(e).Icon;
-                        }
-
-                        posPacket.SpriteId = spriteId;
-                    }
-                });
-            }
-
             NetDataWriter writer = new NetDataWriter();
             _packetProcessor.Write(writer, packet);
-
             foreach (var session in _playerSessions.Values)
             {
-                if (_world.Has<Zone>(session.Entity) && _world.Get<Zone>(session.Entity).Id == targetZoneId)
-                {
-                    session.Peer.Send(writer, method);
-                }
+                if (_world.Has<Zone>(session.Entity) && _world.Get<Zone>(session.Entity).Id == targetZoneId) session.Peer.Send(writer, method);
             }
         }
-        private void OnSheetRequested(RequestSheetPacket packet, NetPeer peer)
-        {
-            if (_world == null || _ruleset == null) return;
-
-            // 1. Who is asking?
-            var entity = GetEntityForPeer(peer);
-            if (entity == Arch.Core.Entity.Null) return;
-
-            Console.WriteLine($"[Server] Generating Sheet for Entity {entity.Id}...");
-
-            // 2. Generate Data via Ruleset
-            var sheetData = _ruleset.GetUI().GetCharacterSheet(_world, entity);
-
-            // 3. Send Back
-            var response = new SheetDataPacket { Sheet = sheetData };
-            BroadcastPacket(response, peer);
-        }
-        private void OnActionReceived(PlayerActionPacket packet, NetPeer peer)
-        {
-            if (_playerSessions.TryGetValue(peer.Id, out var session))
-            {
-                OnPlayerAction?.Invoke(session.Entity, packet.Action);
-            }
-        }
-        private void OnRequestInventory(RequestInventoryPacket packet, NetPeer peer)
-        {
-            if (_world == null || _factory == null) return;
-
-            var player = GetEntityForPeer(peer);
-            if (player == Arch.Core.Entity.Null) return;
-
-            // 1. Get Inventory Component
-            if (_world.Has<Inventory>(player))
-            {
-                var invComponent = _world.Get<Inventory>(player);
-                var data = new TTRPG.Shared.DTOs.InventoryData { Capacity = invComponent.Capacity };
-
-                // 2. Map IDs to Display Data
-                if (invComponent.Items != null)
-                {
-                    foreach (var itemId in invComponent.Items)
-                    {
-                        var bp = _factory.GetBlueprint(itemId);
-                        if (bp != null)
-                        {
-                            // Extract metadata from the Blueprint's "Item" component dictionary
-                            string name = bp.Name;
-                            string icon = "goblin"; // Fallback
-                            string desc = "";
-
-                            if (bp.Components.TryGetValue("Item", out var itemRaw) && itemRaw is Dictionary<string, object> itemData)
-                            {
-                                // Safe lookups (YAML keys are usually camelCase due to loader conventions)
-                                if (itemData.ContainsKey("name")) name = itemData["name"].ToString();
-                                if (itemData.ContainsKey("icon")) icon = itemData["icon"].ToString();
-                                if (itemData.ContainsKey("description")) desc = itemData["description"].ToString();
-                            }
-
-                            data.Items.Add(new ItemDisplay
-                            {
-                                Id = itemId,
-                                Name = name,
-                                Icon = icon,
-                                Description = desc,
-                                Count = 1
-                            });
-                        }
-                    }
-                }
-
-                // 3. Send Packet
-                var response = new InventoryPacket { Data = data };
-                BroadcastPacket(response, peer);
-                Console.WriteLine($"[Inventory] Sent {data.Items.Count} items to peer {peer.Id}");
-            }
-        }
-        public void SetFactory(EntityFactory factory) => _factory = factory;
         public void OnNetworkError(IPEndPoint e, System.Net.Sockets.SocketError s) { }
         public void OnNetworkReceiveUnconnected(IPEndPoint e, NetPacketReader r, UnconnectedMessageType m) { }
         public void OnNetworkLatencyUpdate(NetPeer p, int l) { }

@@ -122,7 +122,7 @@ namespace TTRPG.Client
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[Map Error] {ex.Message}"); }
 
             // --- LOAD UI ---
-            _uiManager?.LoadContent();
+            _uiManager?.LoadContent(_textureManager);
         }
 
         protected override void Update(GameTime gameTime)
