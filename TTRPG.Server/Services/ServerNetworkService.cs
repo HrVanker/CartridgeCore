@@ -2,14 +2,15 @@
 using System.Collections.Generic;
 using System.Net;
 using Arch.Core;
+using Arch.Core.Extensions;
 using LiteNetLib;
 using LiteNetLib.Utils;
-using TTRPG.Shared;
-using TTRPG.Shared.Enums;
-using TTRPG.Shared.Components;
-using Arch.Core.Extensions;
-using TTRPG.Core; // Required for IRuleset
 using Newtonsoft.Json;
+using TTRPG.Core; // Required for IRuleset
+using TTRPG.Shared;
+using TTRPG.Shared.Components;
+using TTRPG.Shared.DTOs;
+using TTRPG.Shared.Enums;
 
 namespace TTRPG.Server.Services
 {
@@ -34,6 +35,11 @@ namespace TTRPG.Server.Services
 
         public ServerNetworkService()
         {
+            _packetProcessor.RegisterNestedType<TTRPG.Shared.DTOs.InventoryData>(
+            (writer, data) => { writer.Put(Newtonsoft.Json.JsonConvert.SerializeObject(data)); },
+            (reader) => { return Newtonsoft.Json.JsonConvert.DeserializeObject<TTRPG.Shared.DTOs.InventoryData>(reader.GetString()); }
+            );
+            _packetProcessor.SubscribeReusable<RequestInventoryPacket, NetPeer>(OnRequestInventory);
             _packetProcessor = new NetPacketProcessor();
 
             // 1. Register Position
@@ -227,6 +233,58 @@ namespace TTRPG.Server.Services
             if (_playerSessions.TryGetValue(peer.Id, out var session))
             {
                 OnPlayerAction?.Invoke(session.Entity, packet.Action);
+            }
+        }
+        private void OnRequestInventory(RequestInventoryPacket packet, NetPeer peer)
+        {
+            if (_world == null || _factory == null) return;
+
+            var player = GetEntityForPeer(peer);
+            if (player == Arch.Core.Entity.Null) return;
+
+            // 1. Get Inventory Component
+            if (_world.Has<Inventory>(player))
+            {
+                var invComponent = _world.Get<Inventory>(player);
+                var data = new TTRPG.Shared.DTOs.InventoryData { Capacity = invComponent.Capacity };
+
+                // 2. Map IDs to Display Data
+                if (invComponent.Items != null)
+                {
+                    foreach (var itemId in invComponent.Items)
+                    {
+                        var bp = _factory.GetBlueprint(itemId);
+                        if (bp != null)
+                        {
+                            // Extract metadata from the Blueprint's "Item" component dictionary
+                            string name = bp.Name;
+                            string icon = "goblin"; // Fallback
+                            string desc = "";
+
+                            if (bp.Components.TryGetValue("Item", out var itemRaw) && itemRaw is Dictionary<string, object> itemData)
+                            {
+                                // Safe lookups (YAML keys are usually camelCase due to loader conventions)
+                                if (itemData.ContainsKey("name")) name = itemData["name"].ToString();
+                                if (itemData.ContainsKey("icon")) icon = itemData["icon"].ToString();
+                                if (itemData.ContainsKey("description")) desc = itemData["description"].ToString();
+                            }
+
+                            data.Items.Add(new ItemDisplay
+                            {
+                                Id = itemId,
+                                Name = name,
+                                Icon = icon,
+                                Description = desc,
+                                Count = 1
+                            });
+                        }
+                    }
+                }
+
+                // 3. Send Packet
+                var response = new InventoryPacket { Data = data };
+                BroadcastPacket(response, peer);
+                Console.WriteLine($"[Inventory] Sent {data.Items.Count} items to peer {peer.Id}");
             }
         }
         public void SetFactory(EntityFactory factory) => _factory = factory;
