@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace TTRPG.Shared.DTOs
+namespace TTRPG.Core.DTOs
 {
     public class InventoryData
     {
@@ -12,7 +12,7 @@ namespace TTRPG.Shared.DTOs
     {
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
-        public string Icon { get; set; } = ""; // e.g. "potion"
+        public string Icon { get; set; } = "";
         public int Count { get; set; } = 1;
         public string Description { get; set; } = "";
     }

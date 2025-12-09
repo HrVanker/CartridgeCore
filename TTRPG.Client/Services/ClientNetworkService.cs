@@ -6,6 +6,7 @@ using TTRPG.Client.Systems;
 using TTRPG.Shared;
 using TTRPG.Shared.Enums;
 using Newtonsoft.Json;
+using TTRPG.Core.DTOs;
 
 namespace TTRPG.Client.Services
 {

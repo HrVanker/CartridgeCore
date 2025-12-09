@@ -9,6 +9,7 @@ using TTRPG.Shared.Enums;
 using TTRPG.Shared.Components;
 using Arch.Core.Extensions;
 using TTRPG.Core;
+using TTRPG.Core.DTOs;
 
 namespace TTRPG.Server.Services
 {
@@ -60,9 +61,9 @@ namespace TTRPG.Server.Services
             );
 
             // Register InventoryData (For Phase 4.4) using JSON
-            _packetProcessor.RegisterNestedType<TTRPG.Shared.DTOs.InventoryData>(
+            _packetProcessor.RegisterNestedType<TTRPG.Core.DTOs.InventoryData>(
                 (writer, data) => { writer.Put(Newtonsoft.Json.JsonConvert.SerializeObject(data)); },
-                (reader) => { return Newtonsoft.Json.JsonConvert.DeserializeObject<TTRPG.Shared.DTOs.InventoryData>(reader.GetString()); }
+                (reader) => { return Newtonsoft.Json.JsonConvert.DeserializeObject<TTRPG.Core.DTOs.InventoryData>(reader.GetString()); }
             );
 
             // Register CharacterSheetData (For Phase 3.4) using JSON

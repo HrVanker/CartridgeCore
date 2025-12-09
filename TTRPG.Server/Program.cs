@@ -1,8 +1,9 @@
 ﻿using System;
-using System.Diagnostics; // Required for Stopwatch
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
-using Arch.Core; // <--- The ECS Core
+using Arch.Core;
+using Microsoft.Extensions.DependencyInjection; // <--- NEW
 using TTRPG.Server.Services;
 using TTRPG.Shared.Components;
 using TTRPG.Core;
@@ -15,181 +16,134 @@ namespace TTRPG.Server
         {
             Console.WriteLine("=== SERVER STARTED ===");
 
-            // 1. Initialize the ECS World (The "Game State")
-            // This holds all entities (players, monsters, items).
-            var world = World.Create();
-            var loader = new BlueprintLoader();
-            string manifestPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "manifest.yaml");
-            var manifest = loader.LoadManifest(manifestPath);
-            var mapService = new MapService();
-            // Load the test map for now (In Phase 3, this will be dynamic based on the Zone)
-            string mapPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "test_map.tmx");
-            mapService.LoadMap(mapPath);
-            var pluginLoader = new PluginLoader();
-            string rulesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TTRPG.Rules.Pathfinder.dll");
+            // --- PHASE 1: LOAD DATA ---
+            // We load data *before* the container because the Factory needs it immediately.
+            var blueprintLoader = new BlueprintLoader();
 
-            IRuleset activeRuleset = null;
-            if (File.Exists(rulesPath))
-            {
-                activeRuleset = pluginLoader.LoadRuleset(rulesPath);
-                activeRuleset.Register(world); // Initialize it
-                Console.WriteLine($"[Program] Active Rules: {activeRuleset.Name}");
-            }
-            else
-            {
-                Console.WriteLine("[Program] WARNING: Pathfinder DLL not found.");
-            }
+            // Load Monsters
+            string monsterPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "monsters.yaml");
+            var blueprints = blueprintLoader.LoadBlueprints(monsterPath);
 
-            Console.WriteLine($"[Cartridge] Loading '{manifest.Name}' (v{manifest.Version}) by {manifest.Author}");
-
-            // 2. Load Blueprints (The "Campaign Cartridge")
-            string dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "monsters.yaml");
-            var blueprints = loader.LoadBlueprints(dataPath);
-            foreach (var dep in manifest.Dependencies)
-            {
-                Console.WriteLine($"  - Requires: {dep.Key} (v{dep.Value}+)");
-                // Simulation: We assume "Core_Rules" is always present.
-                if (dep.Key == "Core_Rules")
-                {
-                    Console.WriteLine("    [OK] Dependency Satisfied.");
-                }
-                else
-                {
-                    Console.WriteLine("    [WARNING] Missing Dependency!");
-                }
-            }
             // Load Items
             string itemPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "items.yaml");
             if (File.Exists(itemPath))
             {
-                var itemBlueprints = loader.LoadBlueprints(itemPath);
-                blueprints.AddRange(itemBlueprints);
+                var items = blueprintLoader.LoadBlueprints(itemPath);
+                blueprints.AddRange(items);
+                Console.WriteLine($"[Loader] Merged {items.Count} items into blueprint database.");
+            }
 
-                Console.WriteLine($"[Loader] Loaded {itemBlueprints.Count} items from items.yaml.");
+            // Load Ruleset
+            var pluginLoader = new PluginLoader();
+            string rulesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TTRPG.Rules.Pathfinder.dll");
+            IRuleset? activeRuleset = null;
+
+            if (File.Exists(rulesPath))
+            {
+                activeRuleset = pluginLoader.LoadRuleset(rulesPath);
+                Console.WriteLine($"[Program] Loaded Rules: {activeRuleset.Name}");
             }
             else
             {
-                Console.WriteLine("[Loader] Warning: items.yaml not found.");
+                Console.WriteLine("[Program] WARNING: Ruleset DLL not found.");
             }
 
-            // 3. Initialize the Factory (The "Builder")
-            // We pass the blueprints so the factory knows how to build a "goblin_grunt"
-            var factory = new EntityFactory(blueprints);
+            // --- PHASE 2: CONFIGURE SERVICES (Dependency Injection) ---
+            var serviceCollection = new ServiceCollection();
 
-            // 4. Spawn Entities (Simulating Level Load)
+            // 1. Core State
+            // Register World as a Singleton so everyone gets the SAME world
+            var world = World.Create();
+            serviceCollection.AddSingleton(world);
+
+            if (activeRuleset != null)
+            {
+                activeRuleset.Register(world);
+                serviceCollection.AddSingleton(activeRuleset);
+            }
+
+            // 2. Services
+            serviceCollection.AddSingleton<EntityFactory>(new EntityFactory(blueprints)); // Inject pre-loaded blueprints
+            serviceCollection.AddSingleton<MapService>();
+            serviceCollection.AddSingleton<ServerNetworkService>();
+            serviceCollection.AddSingleton<NotificationService>();
+            serviceCollection.AddSingleton<GameLoopService>(); // Automatically gets Network, World, Notification, Map injected!
+
+            // 3. Build Provider
+            var provider = serviceCollection.BuildServiceProvider();
+
+            // --- PHASE 3: INITIALIZE ---
+
+            // Init Map
+            var mapService = provider.GetRequiredService<MapService>();
+            string mapPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "test_map.tmx");
+            mapService.LoadMap(mapPath);
+
+            // Init Network
+            var network = provider.GetRequiredService<ServerNetworkService>();
+            network.SetWorld(world);
+            network.SetFactory(provider.GetRequiredService<EntityFactory>());
+            if (activeRuleset != null) network.SetRuleset(activeRuleset);
+
+            network.Start(9050);
+
+            // Spawn Initial World State
+            var factory = provider.GetRequiredService<EntityFactory>();
             if (blueprints.Count > 0)
             {
-                Console.WriteLine("[Server] Spawning entities...");
-
-                // Spawn a standard Goblin
-                var goblin = factory.Create("goblin_grunt", world);
-
-                // Apply the "Elite" Template (Decorator Pattern)
-                factory.ApplyTemplate(goblin, "template_elite", world);
-                // --- NEW: Spawn a Test Potion ---
-                // We manually add Position/Zone because items on the ground need to physically exist
+                // Potion Spawn
                 var potion = factory.Create("potion_healing", world);
                 var potionPos = new Position { X = 3, Y = 3 };
                 var zId = GameLoopService.GetZoneIdForPosition(potionPos.X, potionPos.Y);
                 world.Add(potion, potionPos, new Zone { Id = zId });
-                Console.WriteLine($"[Server] Spawned Test Potion (Entity {potion.Id}) at (3,3) in {zId}");
-
-                // VERIFY COMPONENTS
-                Console.WriteLine($"[Verify] Potion has Position: {world.Has<Position>(potion)}");
-                Console.WriteLine($"[Verify] Potion has Zone: {world.Has<Zone>(potion)}");
-
-                // --- VERIFICATION START ---
-                // We ask the World: "Give me the Stats and Health for this specific goblin entity"
-                // Note: Ensure TTRPG.Shared.Components is using'd at the top
-                if (world.Has<Stats>(goblin))
-                {
-                    var stats = world.Get<Stats>(goblin);
-                    Console.WriteLine($"[Verify] Goblin Strength: {stats.Strength} (Expected: 18)");
-                }
-
-                if (world.Has<Health>(goblin))
-                {
-                    var health = world.Get<Health>(goblin);
-                    Console.WriteLine($"[Verify] Goblin Health: {health.Current}/{health.Max} (Expected: 50/50)");
-                }
+                Console.WriteLine($"[Server] Spawned Potion at {potionPos.X},{potionPos.Y}");
             }
 
-            // 5. Verify Spawns
-            // We ask Arch: "How many entities exist right now?"
-            var count = world.CountEntities(new QueryDescription());
-            Console.WriteLine($"[Server] Total Entities Active in World: {count}");
+            // --- PHASE 4: GAME LOOP ---
+            var gameLoop = provider.GetRequiredService<GameLoopService>();
+            var notificationService = provider.GetRequiredService<NotificationService>();
 
-            // 6. Start Networking
-            var serverService = new ServerNetworkService();
-            serverService.SetWorld(world);
-            serverService.SetFactory(factory);
-            if (activeRuleset != null) serverService.SetRuleset(activeRuleset);
-            serverService.Start(9050);
-
-            Console.WriteLine("Press ESC to stop...");
-
-            // 7. Main Loop
-            var stopwatch = Stopwatch.StartNew();
-            var notificationService = new NotificationService(serverService, world);
-
-            // 8. HOOK UP SPAWNING LOGIC
-            // When a peer connects, create a Goblin for them!
-            var gameLoop = new GameLoopService(serverService, world, notificationService, mapService);
-            serverService.OnPlayerConnected += (peer) =>
+            // Hook Player Connection Logic
+            network.OnPlayerConnected += (peer) =>
             {
                 Console.WriteLine($"[Server] Spawning Player for Peer {peer.Id}...");
-
                 var playerEntity = factory.Create("goblin_grunt", world);
 
-                // ADD ZONE COMPONENT
+                // Auto-Zone
                 if (world.Has<Position>(playerEntity))
                 {
                     var pos = world.Get<Position>(playerEntity);
                     var zoneId = GameLoopService.GetZoneIdForPosition(pos.X, pos.Y);
                     world.Add(playerEntity, new Zone { Id = zoneId });
                 }
-                else
-                {
-                    // Fallback if YAML has no position
-                    world.Add(playerEntity, new Position { X = 0, Y = 0 });
-                    world.Add(playerEntity, new Zone { Id = "Zone_A" });
-                }
 
-                serverService.RegisterPlayerEntity(peer, playerEntity);
+                network.RegisterPlayerEntity(peer, playerEntity);
             };
 
+            Console.WriteLine("Server Running. Press ESC to stop.");
+
+            var stopwatch = Stopwatch.StartNew();
             bool isRunning = true;
+
             while (isRunning)
             {
-                // Calculate Delta Time
                 float deltaTime = (float)stopwatch.Elapsed.TotalSeconds;
                 stopwatch.Restart();
 
-                serverService.Poll();
+                network.Poll();
                 gameLoop.Update(deltaTime);
 
                 Thread.Sleep(15);
 
-                // FIX: READ KEY ONCE
                 if (Console.KeyAvailable)
                 {
-                    // Consumes the key from the buffer immediately
                     var key = Console.ReadKey(true).Key;
-
-                    if (key == ConsoleKey.Escape)
-                    {
-                        isRunning = false;
-                    }
-                    else if (key == ConsoleKey.C)
-                    {
-                        // Now 'C' will actually trigger!
-                        notificationService.ToggleMode();
-                    }
+                    if (key == ConsoleKey.Escape) isRunning = false;
+                    if (key == ConsoleKey.C) notificationService.ToggleMode();
                 }
             }
 
-            // Cleanup
-            serverService.Stop();
+            network.Stop();
             World.Destroy(world);
             Console.WriteLine("Server stopped.");
         }
