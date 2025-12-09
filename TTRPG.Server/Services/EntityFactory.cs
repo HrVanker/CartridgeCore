@@ -1,41 +1,52 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection; // Required for the fix
+using System.Reflection;
 using Arch.Core;
 using Arch.Core.Extensions;
-using TTRPG.Core;
 using TTRPG.Shared.DTOs;
+// IMPORTANT: Ensure we reference the namespace where Inventory lives to force assembly load
+using TTRPG.Shared.Components;
 
 namespace TTRPG.Server.Services
 {
-    public class EntityFactory : IEntityFactory
+    public class EntityFactory
     {
         private readonly Dictionary<string, EntityBlueprint> _blueprints;
-        private readonly Dictionary<string, Type> _componentRegistry;
 
-        // Cache MethodInfos to improve performance (optional but good practice)
-        private static readonly MethodInfo _setMethodTemplate = typeof(World).GetMethods()
-            .First(m => m.Name == "Set" && m.IsGenericMethod && m.GetParameters().Length == 2);
+        // RESTORED: The Type Cache
+        private readonly Dictionary<string, Type> _componentTypes = new Dictionary<string, Type>();
 
-        private static readonly MethodInfo _addMethodTemplate = typeof(World).GetMethods()
-            .First(m => m.Name == "Add" && m.IsGenericMethod && m.GetParameters().Length == 2);
-
-        public EntityFactory(List<EntityBlueprint> blueprints)
+        public EntityFactory(IEnumerable<EntityBlueprint> blueprints)
         {
             _blueprints = blueprints.ToDictionary(b => b.Id);
-            _componentRegistry = new Dictionary<string, Type>();
+            LoadTypes(); // RESTORED: Call the loader
+        }
 
-            // AUTO-DISCOVERY
-            var assembly = typeof(TTRPG.Shared.Components.Position).Assembly;
+        public EntityFactory(Dictionary<string, EntityBlueprint> blueprints)
+        {
+            _blueprints = blueprints;
+            LoadTypes();
+        }
 
-            foreach (var type in assembly.GetTypes())
+        // RESTORED: The Assembly Scanner
+        private void LoadTypes()
+        {
+            _componentTypes.Clear();
+
+            // 1. Force load the assembly containing standard components
+            // We use typeof(Inventory) to guarantee we get TTRPG.Shared
+            var sharedAssembly = typeof(Inventory).Assembly;
+
+            foreach (var type in sharedAssembly.GetTypes())
             {
-                if (type.IsValueType && !type.IsEnum)
+                if (type.IsValueType || type.IsClass)
                 {
-                    _componentRegistry[type.Name] = type;
+                    _componentTypes[type.Name] = type;
                 }
             }
+
+            Console.WriteLine($"[Factory] Loaded {_componentTypes.Count} component types from Shared.");
         }
 
         public Entity Create(string blueprintId, World world)
@@ -48,14 +59,13 @@ namespace TTRPG.Server.Services
             var blueprint = _blueprints[blueprintId];
             var entity = world.Create();
 
-            Console.WriteLine($"[Factory] Building entity '{blueprintId}'...");
+            // Console.WriteLine($"[Factory] Building entity '{blueprintId}'...");
 
             foreach (var componentName in blueprint.Components.Keys)
             {
-                // 1. Check if Type exists
                 if (!_componentTypes.ContainsKey(componentName))
                 {
-                    Console.WriteLine($"[Factory] ERROR: Component type '{componentName}' not found in TTRPG.Shared!");
+                    Console.WriteLine($"[Factory] ERROR: Component type '{componentName}' not found!");
                     continue;
                 }
 
@@ -64,16 +74,13 @@ namespace TTRPG.Server.Services
 
                 try
                 {
-                    // 2. Attempt Creation
                     var componentInstance = CreateComponentFromData(type, componentData);
-
-                    // 3. Add to World
                     SetOrAddComponent(world, entity, componentInstance, type);
 
-                    // Debug Log for Inventory specifically
+                    // DEBUG: Confirm Inventory is added
                     if (componentName == "Inventory")
                     {
-                        Console.WriteLine($"[Factory] SUCCESS: Added Inventory to {blueprintId}");
+                        // Console.WriteLine($"[Factory] SUCCESS: Added Inventory to {blueprintId}");
                     }
                 }
                 catch (Exception ex)
@@ -87,66 +94,18 @@ namespace TTRPG.Server.Services
 
         public void ApplyTemplate(Entity entity, string templateId, World world)
         {
-            if (!_blueprints.TryGetValue(templateId, out var blueprint))
+            if (!_blueprints.ContainsKey(templateId)) return;
+
+            var template = _blueprints[templateId];
+            foreach (var componentName in template.Components.Keys)
             {
-                Console.WriteLine($"[Factory] Warning: Template '{templateId}' not found.");
-                return;
-            }
-
-            Console.WriteLine($"[Factory] Applying Template: {blueprint.Name}");
-
-            foreach (var compEntry in blueprint.Components)
-            {
-                string compName = compEntry.Key;
-                var compData = compEntry.Value;
-
-                if (_componentRegistry.TryGetValue(compName, out var compType))
+                if (_componentTypes.TryGetValue(componentName, out var type))
                 {
-                    object newComponentData = CreateComponentFromData(compType, compData);
-
-                    // FIX: Use Reflection to invoke the Generic Set<T> / Add<T> methods.
-                    // This forces the Runtime to unbox the 'object' into the actual Struct 
-                    // before handing it to Arch. This prevents InvalidCastExceptions 
-                    // caused by trying to shove a Boxed Object into a Struct Array.
-                    SetOrAddComponent(world, entity, newComponentData, compType);
+                    var data = template.Components[componentName];
+                    var component = CreateComponentFromData(type, data);
+                    SetOrAddComponent(world, entity, component, type);
                 }
             }
-        }
-
-        private void SetOrAddComponent(World world, Entity entity, object component, Type componentType)
-        {
-            // 1. Define match criteria for the Entity parameter (can be "Entity" or "ref Entity")
-            bool IsEntityParam(ParameterInfo p) =>
-                p.ParameterType == typeof(Entity) ||
-                p.ParameterType == typeof(Entity).MakeByRefType();
-
-            // 2. Find "Has<T>(Entity)"
-            var hasMethod = typeof(World).GetMethods()
-                .FirstOrDefault(m => m.Name == "Has" &&
-                                     m.IsGenericMethod &&
-                                     m.GetParameters().Length == 1 &&
-                                     IsEntityParam(m.GetParameters()[0]));
-
-            if (hasMethod == null) throw new MissingMethodException($"Could not find World.Has<{componentType.Name}>(Entity)");
-
-            // 3. Check if the entity already has the component
-            var hasGeneric = hasMethod.MakeGenericMethod(componentType);
-            bool alreadyHasComponent = (bool)hasGeneric.Invoke(world, new object[] { entity })!;
-
-            // 4. Select "Set<T>" or "Add<T>" based on existence
-            string methodName = alreadyHasComponent ? "Set" : "Add";
-
-            var actionMethod = typeof(World).GetMethods()
-                .FirstOrDefault(m => m.Name == methodName &&
-                                     m.IsGenericMethod &&
-                                     m.GetParameters().Length == 2 &&
-                                     IsEntityParam(m.GetParameters()[0]));
-
-            if (actionMethod == null) throw new MissingMethodException($"Could not find World.{methodName}<{componentType.Name}>(Entity, Component)");
-
-            // 5. Invoke the correct method
-            var actionGeneric = actionMethod.MakeGenericMethod(componentType);
-            actionGeneric.Invoke(world, new object[] { entity, component });
         }
 
         private object CreateComponentFromData(Type type, Dictionary<string, object> data)
@@ -155,6 +114,7 @@ namespace TTRPG.Server.Services
 
             foreach (var field in type.GetFields())
             {
+                // Case-insensitive match for YAML keys (e.g. "strength" vs "Strength")
                 var key = data.Keys.FirstOrDefault(k => k.Equals(field.Name, StringComparison.OrdinalIgnoreCase));
 
                 if (key != null)
@@ -162,15 +122,16 @@ namespace TTRPG.Server.Services
                     object val = data[key];
                     try
                     {
-                        // NEW: Handle Lists (YAML often deserializes as List<object>)
-                        if (val is List<object> listObj && field.FieldType == typeof(List<string>))
+                        // FIX: List<string> handling for Inventory.Items
+                        if (field.FieldType == typeof(List<string>) && val is List<object> listObj)
                         {
                             var listStr = listObj.Select(x => x.ToString()).ToList();
                             field.SetValue(instance, listStr);
                         }
                         else
                         {
-                            // Standard Value Types
+                            // Standard Value Types (int, float, string)
+                            // Convert.ChangeType handles mostly everything (long -> int, double -> float)
                             object convertedVal = Convert.ChangeType(val, field.FieldType);
                             field.SetValue(instance, convertedVal);
                         }
@@ -182,6 +143,32 @@ namespace TTRPG.Server.Services
                 }
             }
             return instance;
+        }
+
+        private void SetOrAddComponent(World world, Entity entity, object component, Type componentType)
+        {
+            // Dynamic Arch Reflection
+            // 1. Check if entity has it
+            var hasMethod = typeof(World).GetMethods()
+                .FirstOrDefault(m => m.Name == "Has" && m.IsGenericMethod && m.GetParameters().Length == 1);
+
+            var hasGeneric = hasMethod!.MakeGenericMethod(componentType);
+            bool alreadyHas = (bool)hasGeneric.Invoke(world, new object[] { entity })!;
+
+            // 2. Select Add or Set
+            string methodName = alreadyHas ? "Set" : "Add";
+
+            var actionMethod = typeof(World).GetMethods()
+                .FirstOrDefault(m => m.Name == methodName &&
+                                     m.IsGenericMethod &&
+                                     m.GetParameters().Length == 2 &&
+                                     m.GetParameters()[0].ParameterType == typeof(Entity)); // Ensure we get the right overload!
+
+            if (actionMethod != null)
+            {
+                var generic = actionMethod.MakeGenericMethod(componentType);
+                generic.Invoke(world, new object[] { entity, component });
+            }
         }
     }
 }

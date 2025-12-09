@@ -23,6 +23,9 @@
       armorClass: 12
       speed: 6
       initiative: 1
+    Inventory:
+      capacity: 10
+      items: []
 
 - id: "orc_warrior"
   name: "Orc Warrior"
