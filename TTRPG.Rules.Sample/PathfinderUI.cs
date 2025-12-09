@@ -21,19 +21,20 @@ namespace TTRPG.Rules.Pathfinder
 
             // 3. Stat Analysis (Simulated "Class" Logic)
             // If the Viewer has High Intelligence (>12), they can analyze stats.
-            if (world.Has<Stats>(viewer))
+            if (world.Has<Attributes>(viewer))
             {
-                var viewerStats = world.Get<Stats>(viewer);
-                if (viewerStats.Intelligence > 12)
+                var viewerAttrs = world.Get<Attributes>(viewer);
+                // Logic: High Intelligence check
+                if (viewerAttrs.Intelligence > 12)
                 {
-                    if (world.Has<Stats>(target))
+                    if (world.Has<Attributes>(target))
                     {
-                        var targetStats = world.Get<Stats>(target);
-                        info["Analysis"] = $"Target has {targetStats.Strength} STR";
+                        var targetAttrs = world.Get<Attributes>(target);
+                        info["Analysis"] = $"Target has {targetAttrs.Strength} STR";
                     }
                     else
                     {
-                        info["Analysis"] = "Target has no stats.";
+                        info["Analysis"] = "Target has no attributes.";
                     }
                 }
             }

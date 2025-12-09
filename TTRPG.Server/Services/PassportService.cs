@@ -19,11 +19,11 @@ namespace TTRPG.Server.Services
             };
 
             // 1. Extract Stats (if present)
-            if (entity.Has<Stats>())
+            if (entity.Has<Attributes>())
             {
-                var stats = entity.Get<Stats>();
+                var stats = entity.Get<Attributes>();
                 passport.RawIntValues["Stats_Strength"] = stats.Strength;
-                passport.RawIntValues["Stats_Agility"] = stats.Agility;
+                passport.RawIntValues["Stats_Dexterity"] = stats.Dexterity;
             }
 
             // 2. Extract Health (if present)

@@ -16,7 +16,7 @@ namespace TTRPG.Tests
 
             // Create a "Player" entity manually
             var player = world.Create(
-                new Stats { Strength = 18, Agility = 10 },
+                new Attributes { Strength = 18, Dexterity = 10 },
                 new Health { Current = 50, Max = 100 }
             );
 

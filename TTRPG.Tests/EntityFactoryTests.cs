@@ -48,11 +48,11 @@ namespace TTRPG.Tests
             factory.ApplyTemplate(entity, "template_elite", world);
 
             // Assert
-            var stats = world.Get<Stats>(entity);
+            var stats = world.Get<Attributes>(entity);
 
             // Verify the values matched the TEMPLATE, not the BASE
             Assert.Equal(18, stats.Strength);
-            Assert.Equal(15, stats.Agility);
+            Assert.Equal(15, stats.Dexterity);
 
             // Cleanup
             World.Destroy(world);

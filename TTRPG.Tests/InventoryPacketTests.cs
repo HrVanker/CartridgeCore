@@ -1,5 +1,5 @@
 ﻿using Xunit;
-using TTRPG.Shared.DTOs;
+using TTRPG.Core.DTOs;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 

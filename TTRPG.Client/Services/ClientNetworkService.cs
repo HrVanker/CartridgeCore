@@ -66,9 +66,9 @@ namespace TTRPG.Client.Services
                 }
             );
             //Register inventory data
-            _packetProcessor.RegisterNestedType<TTRPG.Shared.DTOs.InventoryData>(
+            _packetProcessor.RegisterNestedType<TTRPG.Core.DTOs.InventoryData>(
                 (writer, data) => { writer.Put(Newtonsoft.Json.JsonConvert.SerializeObject(data)); },
-                (reader) => { return Newtonsoft.Json.JsonConvert.DeserializeObject<TTRPG.Shared.DTOs.InventoryData>(reader.GetString()); }
+                (reader) => { return Newtonsoft.Json.JsonConvert.DeserializeObject<TTRPG.Core.DTOs.InventoryData>(reader.GetString()); }
             );
 
             // Subscribe

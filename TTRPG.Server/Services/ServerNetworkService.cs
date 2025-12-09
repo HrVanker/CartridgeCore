@@ -138,7 +138,7 @@ namespace TTRPG.Server.Services
             if (_world.Has<Inventory>(player))
             {
                 var invComponent = _world.Get<Inventory>(player);
-                var data = new TTRPG.Shared.DTOs.InventoryData { Capacity = invComponent.Capacity };
+                var data = new TTRPG.Core.DTOs.InventoryData { Capacity = invComponent.Capacity };
 
                 if (invComponent.Items != null)
                 {
@@ -156,7 +156,7 @@ namespace TTRPG.Server.Services
                                 if (itemData.ContainsKey("icon")) icon = itemData["icon"].ToString();
                                 if (itemData.ContainsKey("description")) desc = itemData["description"].ToString();
                             }
-                            data.Items.Add(new TTRPG.Shared.DTOs.ItemDisplay { Id = itemId, Name = name, Icon = icon, Description = desc, Count = 1 });
+                            data.Items.Add(new TTRPG.Core.DTOs.ItemDisplay { Id = itemId, Name = name, Icon = icon, Description = desc, Count = 1 });
                         }
                     }
                 }

@@ -16,13 +16,10 @@ namespace TTRPG.Tests
             var world = World.Create();
             var ui = new PathfinderUI();
 
-            var target = world.Create(new Stats { Strength = 18, Intelligence = 5 });
-
-            // Viewer 1: Dumb (Int 8)
-            var dumbViewer = world.Create(new Stats { Intelligence = 8 });
-
-            // Viewer 2: Smart (Int 18)
-            var smartViewer = world.Create(new Stats { Intelligence = 18 });
+            // FIX: Use Attributes
+            var target = world.Create(new Attributes { Strength = 18, Intelligence = 5 });
+            var dumbViewer = world.Create(new Attributes { Intelligence = 8 });
+            var smartViewer = world.Create(new Attributes { Intelligence = 18 });
 
             // Act
             var dumbView = ui.GetInspectionDetails(world, dumbViewer, target);
