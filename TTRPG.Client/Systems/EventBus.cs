@@ -1,6 +1,7 @@
 ﻿using System;
 using TTRPG.Core.DTOs;
 using TTRPG.Shared.Components;
+using TTRPG.Shared.DTOs;
 using TTRPG.Shared.Enums;
 
 namespace TTRPG.Client.Systems
@@ -46,6 +47,12 @@ namespace TTRPG.Client.Systems
         public static void PublishSheetReceived(CharacterSheetData sheet)
         {
             OnSheetReceived?.Invoke(sheet);
+        }
+        public static event Action<InventoryData>? OnInventoryReceived;
+
+        public static void PublishInventoryReceived(InventoryData data)
+        {
+            OnInventoryReceived?.Invoke(data);
         }
     }
 }

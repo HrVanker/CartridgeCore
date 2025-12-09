@@ -64,6 +64,11 @@ namespace TTRPG.Client.Services
                     return JsonConvert.DeserializeObject<TTRPG.Core.DTOs.CharacterSheetData>(json);
                 }
             );
+            //Register inventory data
+            _packetProcessor.RegisterNestedType<TTRPG.Shared.DTOs.InventoryData>(
+                (writer, data) => { writer.Put(Newtonsoft.Json.JsonConvert.SerializeObject(data)); },
+                (reader) => { return Newtonsoft.Json.JsonConvert.DeserializeObject<TTRPG.Shared.DTOs.InventoryData>(reader.GetString()); }
+            );
 
             // Subscribe
             _packetProcessor.SubscribeReusable<SheetDataPacket>(OnSheetReceived);
@@ -90,6 +95,7 @@ namespace TTRPG.Client.Services
             {
                 Console.WriteLine($"[Client] Disconnected: {info.Reason}");
             };
+            _packetProcessor.SubscribeReusable<InventoryPacket>(p => EventBus.PublishInventoryReceived(p.Data));
         }
 
         public void Connect(string ip, int port)
@@ -198,6 +204,13 @@ namespace TTRPG.Client.Services
         public void SendAction(TTRPG.Shared.Enums.ActionType action)
         {
             var packet = new PlayerActionPacket { Action = action };
+            NetDataWriter writer = new NetDataWriter();
+            _packetProcessor.Write(writer, packet);
+            _client.FirstPeer?.Send(writer, DeliveryMethod.ReliableOrdered);
+        }
+        public void RequestInventory()
+        {
+            var packet = new RequestInventoryPacket();
             NetDataWriter writer = new NetDataWriter();
             _packetProcessor.Write(writer, packet);
             _client.FirstPeer?.Send(writer, DeliveryMethod.ReliableOrdered);

@@ -110,6 +110,9 @@ namespace TTRPG.Client
             _textureManager = new TextureManager(GraphicsDevice);
             _textureManager.LoadContent();
 
+            //Pass TextureManager to UIManager
+            _uiManager?.LoadContent(_textureManager);
+
             _mapRenderer = new TiledMapRenderer(GraphicsDevice, _textureManager);
             try
             {

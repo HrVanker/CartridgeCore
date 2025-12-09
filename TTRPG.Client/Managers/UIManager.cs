@@ -4,10 +4,12 @@ using Microsoft.Xna.Framework.Input;
 using Myra;
 using Myra.Graphics2D;
 using Myra.Graphics2D.Brushes;
+using Myra.Graphics2D.TextureAtlases;
 using Myra.Graphics2D.UI;
 using TTRPG.Client.Services;
 using TTRPG.Client.Systems;
 using TTRPG.Core.DTOs;
+using TTRPG.Shared.DTOs;
 
 namespace TTRPG.Client.Managers
 {
@@ -16,6 +18,7 @@ namespace TTRPG.Client.Managers
         private readonly Desktop _desktop;
         private readonly ClientNetworkService _network;
         private readonly InputManager _input;
+        private TextureManager? _textureManager;
 
         // Widgets
         private ListView _chatList;
@@ -29,6 +32,10 @@ namespace TTRPG.Client.Managers
         private Window _characterWindow;
         private Grid _statsGrid; // Where we list the stats
 
+        //Inventory Widget
+        private Window _inventoryWindow;
+        private Grid _inventoryGrid;
+
         public bool IsInputCaptured => _desktop.FocusedKeyboardWidget != null;
 
         public UIManager(Game game, ClientNetworkService network, InputManager input)
@@ -41,6 +48,7 @@ namespace TTRPG.Client.Managers
 
         public void LoadContent()
         {
+            _textureManager = textureManager;
             // 1. Build Chat Layout (Existing)
             var mainGrid = new Grid
             {
@@ -110,14 +118,37 @@ namespace TTRPG.Client.Managers
             scroll.Content = _statsGrid;
             _characterWindow.Content = scroll;
 
+            _inventoryWindow = new Window
+            {
+                Title = "Inventory",
+                Width = 400,
+                Height = 300,
+                Visible = false
+            };
+
+            var invScroll = new ScrollViewer();
+            _inventoryGrid = new Grid
+            {
+                ColumnSpacing = 5,
+                RowSpacing = 5,
+                Width = 380
+            };
+            // Define 4 Columns for the grid
+            for (int i = 0; i < 4; i++) _inventoryGrid.ColumnsProportions.Add(new Proportion(ProportionType.Part));
+
+            invScroll.Content = _inventoryGrid;
+            _inventoryWindow.Content = invScroll;
+
             // 4. Add to Desktop
             _desktop.Widgets.Add(mainGrid);
             _desktop.Widgets.Add(_tooltipLabel);
             _desktop.Widgets.Add(_characterWindow);
+            _desktop.Widgets.Add(_inventoryWindow);
 
             // 5. Hook Events
             EventBus.OnChatReceived += OnChatReceived;
             EventBus.OnEntityInspected += ShowTooltip;
+            EventBus.OnInventoryReceived += RefreshInventory;
 
             // NEW: Hook Sheet Data
             EventBus.OnSheetReceived += RefreshCharacterSheet;
@@ -165,6 +196,17 @@ namespace TTRPG.Client.Managers
                     _statsGrid.Widgets.Clear();
                     _statsGrid.Widgets.Add(new Label { Text = "Loading..." });
                     _network.RequestCharacterSheet();
+                }
+            }
+            //Toggle Inventory
+            if (_input.IsKeyPressedRaw(Keys.I))
+            {
+                _inventoryWindow.Visible = !_inventoryWindow.Visible;
+                if (_inventoryWindow.Visible)
+                {
+                    _inventoryGrid.Widgets.Clear();
+                    _inventoryGrid.Widgets.Add(new Label { Text = "Loading..." });
+                    _network.RequestInventory();
                 }
             }
         }
@@ -223,6 +265,63 @@ namespace TTRPG.Client.Managers
                     _statsGrid.Widgets.Add(val);
 
                     currentRow++;
+                }
+            }
+        }
+        private void RefreshInventory(InventoryData data)
+        {
+            _inventoryWindow.Title = $"Inventory ({data.Items.Count}/{data.Capacity})";
+            _inventoryGrid.Widgets.Clear();
+            _inventoryGrid.RowsProportions.Clear();
+
+            int col = 0;
+            int row = 0;
+            _inventoryGrid.RowsProportions.Add(new Proportion(ProportionType.Auto));
+
+            foreach (var item in data.Items)
+            {
+                // Container for Icon + Text
+                var stack = new VerticalStackPanel
+                {
+                    Spacing = 2,
+                    HorizontalAlignment = HorizontalAlignment.Center
+                };
+
+                // 1. Icon
+                var texture = _textureManager?.GetTexture(item.Icon);
+                if (texture != null)
+                {
+                    var image = new Image
+                    {
+                        Renderable = new TextureRegion(texture),
+                        Width = 32,
+                        Height = 32,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    };
+                    stack.Widgets.Add(image);
+                }
+
+                // 2. Name
+                var lbl = new Label
+                {
+                    Text = item.Name,
+                    TextColor = Color.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    FontScale = 0.8f
+                };
+                stack.Widgets.Add(lbl);
+
+                // Grid Placement
+                Grid.SetColumn(stack, col);
+                Grid.SetRow(stack, row);
+                _inventoryGrid.Widgets.Add(stack);
+
+                col++;
+                if (col >= 4) // 4 Items per row
+                {
+                    col = 0;
+                    row++;
+                    _inventoryGrid.RowsProportions.Add(new Proportion(ProportionType.Auto));
                 }
             }
         }
