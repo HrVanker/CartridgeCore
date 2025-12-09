@@ -27,6 +27,7 @@ namespace TTRPG.Server.Services
         public Action<Entity, MoveDirection>? OnPlayerInput;
         public Action<NetPeer, ChatMessagePacket>? OnChatMessage;
         public Action<Entity, ActionType>? OnPlayerAction;
+        private EntityFactory? _factory;
 
         private Arch.Core.World? _world;
         private IRuleset? _ruleset; // NEW Field
@@ -228,6 +229,7 @@ namespace TTRPG.Server.Services
                 OnPlayerAction?.Invoke(session.Entity, packet.Action);
             }
         }
+        public void SetFactory(EntityFactory factory) => _factory = factory;
         public void OnNetworkError(IPEndPoint e, System.Net.Sockets.SocketError s) { }
         public void OnNetworkReceiveUnconnected(IPEndPoint e, NetPacketReader r, UnconnectedMessageType m) { }
         public void OnNetworkLatencyUpdate(NetPeer p, int l) { }

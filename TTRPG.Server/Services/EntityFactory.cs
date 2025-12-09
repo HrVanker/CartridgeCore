@@ -170,5 +170,13 @@ namespace TTRPG.Server.Services
                 generic.Invoke(world, new object[] { entity, component });
             }
         }
+        public EntityBlueprint? GetBlueprint(string id)
+        {
+            if (_blueprints.ContainsKey(id))
+            {
+                return _blueprints[id];
+            }
+            return null;
+        }
     }
 }

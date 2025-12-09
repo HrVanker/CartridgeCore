@@ -1,6 +1,7 @@
-﻿using TTRPG.Shared.Components; // For Position struct
+﻿using TTRPG.Core.DTOs;
+using TTRPG.Shared.Components; // For Position struct
+using TTRPG.Shared.DTOs;
 using TTRPG.Shared.Enums;
-using TTRPG.Core.DTOs;
 
 namespace TTRPG.Shared
 {
@@ -69,5 +70,11 @@ namespace TTRPG.Shared
     public class PlayerActionPacket
     {
         public ActionType Action { get; set; }
+    }
+    public class RequestInventoryPacket { }
+
+    public class InventoryPacket
+    {
+        public InventoryData Data { get; set; } = new InventoryData();
     }
 }

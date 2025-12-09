@@ -122,6 +122,7 @@ namespace TTRPG.Server
             // 6. Start Networking
             var serverService = new ServerNetworkService();
             serverService.SetWorld(world);
+            serverService.SetFactory(factory);
             if (activeRuleset != null) serverService.SetRuleset(activeRuleset);
             serverService.Start(9050);
 
