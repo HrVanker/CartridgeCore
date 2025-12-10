@@ -119,10 +119,17 @@ namespace TTRPG.Client.Managers
             _desktop.Widgets.Add(_characterWindow);
             _desktop.Widgets.Add(_inventoryWindow);
 
-            // Hook Events
+            // 4. Hook Events (Safe Pattern)
+            EventBus.OnChatReceived -= OnChatReceived; // Ensure removed first
             EventBus.OnChatReceived += OnChatReceived;
+
+            EventBus.OnEntityInspected -= ShowTooltip;
             EventBus.OnEntityInspected += ShowTooltip;
+
+            EventBus.OnSheetReceived -= RefreshCharacterSheet;
             EventBus.OnSheetReceived += RefreshCharacterSheet;
+
+            EventBus.OnInventoryReceived -= RefreshInventory;
             EventBus.OnInventoryReceived += RefreshInventory;
         }
 
@@ -157,7 +164,7 @@ namespace TTRPG.Client.Managers
         public void Draw() => _desktop.Render();
         public void Unfocus() => _desktop.FocusedKeyboardWidget = null;
         public bool IsMouseOverUI() => _desktop.IsMouseOverGUI;
-        private void OnChatReceived(string s, string m) { var l = new Label { Text = $"{s}: {m}", Wrap = true, TextColor = Color.White }; _chatList.Widgets.Add(l); if (_chatList.Widgets.Count > 0) _chatList.SelectedIndex = _chatList.Widgets.Count - 1; }
+        private void OnChatReceived(string s, string m) { System.Diagnostics.Debug.WriteLine($"[UI] Adding Chat: {m}");  var l = new Label { Text = $"{s}: {m}", Wrap = true, TextColor = Color.White }; _chatList.Widgets.Add(l); if (_chatList.Widgets.Count > 0) _chatList.SelectedIndex = _chatList.Widgets.Count - 1; }
 
         private void RefreshCharacterSheet(CharacterSheetData data)
         {
