@@ -41,7 +41,8 @@ namespace TTRPG.Tests
                     {
                         "Attributes", new Dictionary<string, object>
                         {
-                            { "Strength", 18 } // Should overwrite 8 -> 18
+                            { "Strength", 18 },
+                            { "Dexterity", 10 }// Should overwrite 8 -> 18
                         }
                     }
                 }
